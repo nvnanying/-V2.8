@@ -1,0 +1,1052 @@
+import React, { useState } from 'react';
+import { 
+  Database, 
+  Users, 
+  User, 
+  Calendar, 
+  FolderLock, 
+  Clipboard, 
+  Search, 
+  Plus, 
+  MoreHorizontal, 
+  TrendingUp, 
+  BookOpen, 
+  Building2, 
+  Edit2, 
+  Trash2, 
+  X, 
+  AlertCircle, 
+  Biohazard,
+  Check,
+  Download
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { WorkflowDesigner, WorkflowItem } from './WorkflowDesigner';
+
+interface DatabaseSource {
+  id: string;
+  name: string;
+  admins: string[];
+  timeSpan: string;
+  lastUpdated: string;
+  usersCount: number;
+  patientsCount: number;
+  recordsCount: number;
+  isCustomIcon?: boolean; // For JH传染病 custom sparkles
+}
+
+const INITIAL_DATABASES: DatabaseSource[] = [
+  {
+    id: 'db1',
+    name: '通用科研库',
+    admins: ['肝胆&肾外科', '陈光俊', '丘绍翔', '谢坤翔', '林谦宏01', '肝胆外科'],
+    timeSpan: '2020-01-26 ~ 2026-04-13',
+    lastUpdated: '2026-05-21',
+    usersCount: 52,
+    patientsCount: 12920,
+    recordsCount: 392531
+  },
+  {
+    id: 'db2',
+    name: '心脏健康',
+    admins: ['陆科宏2', '吴汶芮', 'test_qy1', 'lkhc', '陈培均', 'test_A'],
+    timeSpan: '2026-01-10 ~ 2026-01-23',
+    lastUpdated: '2026-05-21',
+    usersCount: 6,
+    patientsCount: 3,
+    recordsCount: 16
+  },
+  {
+    id: 'db3',
+    name: '0312归一',
+    admins: ['吴汶芮', 'test_A'],
+    timeSpan: '2026-01-10 ~ 2026-01-19',
+    lastUpdated: '2026-05-21',
+    usersCount: 2,
+    patientsCount: 1,
+    recordsCount: 3
+  },
+  {
+    id: 'db4',
+    name: 'A',
+    admins: ['test_A', '高家勇'],
+    timeSpan: '2024-01-01 ~ 2026-01-23',
+    lastUpdated: '2026-05-21',
+    usersCount: 2,
+    patientsCount: 30,
+    recordsCount: 1401
+  },
+  {
+    id: 'db5',
+    name: '0413创建1',
+    admins: ['吴汶芮', 'test_A'],
+    timeSpan: '2024-01-01 ~ 2025-12-31',
+    lastUpdated: '2026-05-21',
+    usersCount: 3,
+    patientsCount: 754,
+    recordsCount: 33528
+  },
+  {
+    id: 'db6',
+    name: 'zbk2',
+    admins: ['test_A'],
+    timeSpan: '2026-01-19 ~ 2026-01-22',
+    lastUpdated: '2026-05-21',
+    usersCount: 1,
+    patientsCount: 1,
+    recordsCount: 6
+  },
+  {
+    id: 'db7',
+    name: 'zzz',
+    admins: ['test_A'],
+    timeSpan: '暂无数据周期',
+    lastUpdated: '2026-05-21',
+    usersCount: 1,
+    patientsCount: 0,
+    recordsCount: 0
+  },
+  {
+    id: 'db8',
+    name: 'ABC',
+    admins: ['test_A'],
+    timeSpan: '2025-03-01 ~ 2025-03-10',
+    lastUpdated: '2026-05-21',
+    usersCount: 1,
+    patientsCount: 0,
+    recordsCount: 0
+  },
+  {
+    id: 'db9',
+    name: 'JH传染病',
+    admins: ['YS', 'test_B', '朱茜茜', '马金航', 'test_A', '周森', '田会英'],
+    timeSpan: '2024-01-01 ~ 2026-04-13',
+    lastUpdated: '2026-05-21',
+    usersCount: 7,
+    patientsCount: 13135,
+    recordsCount: 393617,
+    isCustomIcon: true
+  },
+  {
+    id: 'db10',
+    name: '非传染病专病库',
+    admins: ['吴汶芮', '柳结华', 'test_A', '陈志伟', '谢俊豪'],
+    timeSpan: '2024-01-01 ~ 2026-01-19',
+    lastUpdated: '2026-05-21',
+    usersCount: 6,
+    patientsCount: 1162,
+    recordsCount: 51764
+  },
+  {
+    id: 'db11',
+    name: '胃病专病库',
+    admins: ['吴汶芮'],
+    timeSpan: '2024-01-01 ~ 2025-12-31',
+    lastUpdated: '2026-05-21',
+    usersCount: 5,
+    patientsCount: 264,
+    recordsCount: 11314
+  },
+  {
+    id: 'db12',
+    name: '心肌炎专病库',
+    admins: ['test_B', '吴汶芮', 'test_A'],
+    timeSpan: '2024-01-01 ~ 2025-12-31',
+    lastUpdated: '2026-05-21',
+    usersCount: 4,
+    patientsCount: 3180,
+    recordsCount: 138624
+  }
+];
+
+export const DatabaseSourceManager = () => {
+  const [databases, setDatabases] = useState<DatabaseSource[]>(INITIAL_DATABASES);
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Custom dialogs & dropdown controls
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Form values
+  const [newDbName, setNewDbName] = useState('');
+  const [newDbAdmins, setNewDbAdmins] = useState('');
+  const [newDbUsers, setNewDbUsers] = useState<number>(1);
+  const [newDbPatients, setNewDbPatients] = useState<number>(0);
+  const [newDbRecords, setNewDbRecords] = useState<number>(0);
+  const [newDbStartDate, setNewDbStartDate] = useState('2024-01-01');
+  const [newDbEndDate, setNewDbEndDate] = useState('2026-05-21');
+  const [editingDb, setEditingDb] = useState<DatabaseSource | null>(null);
+
+  // States for dynamic export workflow configuration screen
+  const [exportingDb, setExportingDb] = useState<DatabaseSource | null>(null);
+  const [exportApproval, setExportApproval] = useState<boolean>(true);
+  const [approvalType, setApprovalType] = useState<'oa' | 'platform'>('platform');
+
+  // Completely dynamic user-defined workflows to implement "whatever flows they configure are generated"
+  const [customWorkflows, setCustomWorkflows] = useState<Array<{
+    id: string;
+    name: string;
+    version: string;
+    modules: string[]; // List of bound active entries
+    workflow: WorkflowItem;
+  }>>([
+    {
+      id: 'wf-1',
+      name: '基础调阅合规审批流',
+      version: 'V1',
+      modules: ['数据中心', '数据检索'],
+      workflow: {
+        id: 'wf_flow_1',
+        category: '数据导出',
+        name: '基础调阅合规审批流',
+        visible: true,
+        visibleRange: '全员',
+        formName: '通用科研库',
+        lastPublish: '2026-05-21',
+        version: 'V1'
+      }
+    },
+    {
+      id: 'wf-2',
+      name: '科研课题安全脱敏流',
+      version: 'V2',
+      modules: ['患者收藏', '课题'],
+      workflow: {
+        id: 'wf_flow_2',
+        category: '数据导出',
+        name: '科研课题安全脱敏流',
+        visible: true,
+        visibleRange: '全员',
+        formName: '通用科研库',
+        lastPublish: '2026-05-21',
+        version: 'V2'
+      }
+    }
+  ]);
+
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>('wf-1');
+
+  const triggerToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  // Derivative general metrics
+  const totalSpecialsCount = databases.length;
+  const timeSpanDays = 2269; 
+  const totalPatients = databases.reduce((sum, d) => sum + d.patientsCount, 0);
+  const totalRecords = databases.reduce((sum, d) => sum + d.recordsCount, 0);
+  const totalDepartments = 37;
+  const totalActiveUsers = 54;
+
+  const handleSearch = () => {
+    // Basic search filtering
+  };
+
+  const filteredDatabases = databases.filter(db => 
+    db.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    db.admins.some(a => a.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
+  const handleSubmitAdd = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDbName.trim()) {
+      triggerToast('请输入专病库名称');
+      return;
+    }
+
+    if (editingDb) {
+      // Editing Mode
+      setDatabases(prev => prev.map(db => {
+        if (db.id === editingDb.id) {
+          return {
+            ...db,
+            name: newDbName,
+            admins: newDbAdmins.split(/[,，]/).map(x => x.trim()).filter(Boolean),
+            usersCount: newDbUsers,
+            patientsCount: newDbPatients,
+            recordsCount: newDbRecords,
+            timeSpan: `${newDbStartDate} ~ ${newDbEndDate}`
+          };
+        }
+        return db;
+      }));
+      triggerToast('专病库配置更新成功');
+    } else {
+      // Creating Mode
+      const newIndex = databases.length + 1;
+      const newDb: DatabaseSource = {
+        id: `db_custom_${Date.now()}`,
+        name: newDbName,
+        admins: newDbAdmins.split(/[,，]/).map(x => x.trim()).filter(Boolean),
+        timeSpan: `${newDbStartDate} ~ ${newDbEndDate}`,
+        lastUpdated: new Date().toISOString().split('T')[0],
+        usersCount: newDbUsers,
+        patientsCount: newDbPatients,
+        recordsCount: newDbRecords,
+        isCustomIcon: Math.random() > 0.8
+      };
+      setDatabases(prev => [...prev, newDb]);
+      triggerToast('新增精排专病库成功！');
+    }
+
+    // Reset fields
+    setShowAddModal(false);
+    setEditingDb(null);
+    setNewDbName('');
+    setNewDbAdmins('');
+    setNewDbUsers(1);
+    setNewDbPatients(0);
+    setNewDbRecords(0);
+  };
+
+  const handleStartEdit = (db: DatabaseSource) => {
+    setEditingDb(db);
+    setNewDbName(db.name);
+    setNewDbAdmins(db.admins.join(', '));
+    setNewDbUsers(db.usersCount);
+    setNewDbPatients(db.patientsCount);
+    setNewDbRecords(db.recordsCount);
+    if (db.timeSpan && db.timeSpan.includes('~')) {
+      const parts = db.timeSpan.split('~');
+      setNewDbStartDate(parts[0].trim());
+      setNewDbEndDate(parts[1].trim());
+    }
+    setActiveMenuId(null);
+    setShowAddModal(true);
+  };
+
+  const handleExportDbConfig = (db: DatabaseSource) => {
+    setExportingDb(db);
+    setExportApproval(true);
+    setApprovalType('platform');
+    setSelectedWorkflowId('wf-1');
+    setActiveMenuId(null);
+  };
+
+  return (
+    <div className="flex-grow flex flex-col space-y-6 overflow-y-auto custom-scrollbar p-1 select-none text-slate-700 relative">
+      {/* Intercept to show modern export config panel matching user request screenshot */}
+      {exportingDb && (
+        <div className="absolute inset-0 bg-[#f8fafc] flex flex-col space-y-6 overflow-y-auto custom-scrollbar p-5 z-40 text-slate-700 select-none">
+          {/* Top breadcrumb controller */}
+          <div className="flex items-center justify-between border-b border-slate-200 bg-white p-4 shadow-sm select-none rounded-xl">
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => setExportingDb(null)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded text-xs font-bold text-slate-700 transition-[#0066ee] cursor-pointer"
+              >
+                ← 返回数据库列表
+              </button>
+              <span className="text-slate-300">|</span>
+              <span className="text-xs font-semibold text-slate-500">导出配置高级管理</span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  triggerToast('导出配置保存成功！');
+                  setExportingDb(null);
+                }}
+                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-xs shadow-sm transition-colors cursor-pointer"
+              >
+                完成配置并保存
+              </button>
+            </div>
+          </div>
+
+          {/* Interactive cards panel conforming exactly to Image 1 layout & typography */}
+          <div className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm space-y-6 select-none w-full">
+            {/* 科研指标库: 通用科研库 */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-2 text-[14px] text-slate-800">
+                <span className="text-slate-500 font-medium text-xs">当前配置的科研库：</span>
+                <span className="font-bold text-slate-950 text-base flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded bg-blue-600 inline-block" />
+                  {exportingDb.name}
+                </span>
+              </div>
+            </div>
+
+            {/* 导出审批 Switch */}
+            <div className="flex items-center gap-4 text-[14px]">
+              <span className="text-slate-600 font-semibold w-24">流程总开关：</span>
+              <button
+                type="button"
+                onClick={() => setExportApproval(!exportApproval)}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  exportApproval ? 'bg-blue-600' : 'bg-slate-200'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                    exportApproval ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+              <span className="text-xs text-slate-400 font-medium">
+                {exportApproval ? '已启用' : '已关闭'}
+              </span>
+            </div>
+
+            {/* 审批方式 Radio toggles */}
+            <div className="flex items-center gap-4 text-[14px]">
+              <span className="text-slate-600 font-semibold w-24">审批方式选择：</span>
+              <div className="flex items-center gap-8">
+                <label className="flex items-center gap-2.5 cursor-pointer group">
+                  <input
+                    type="radio"
+                    name="approvalTypeGroup"
+                    value="oa"
+                    checked={approvalType === 'oa'}
+                    onChange={() => setApprovalType('oa')}
+                    className="w-4 h-4 text-blue-600 accent-blue-600 cursor-pointer border-slate-300"
+                  />
+                  <span className={`text-[13px] ${approvalType === 'oa' ? 'text-slate-900 font-bold' : 'text-slate-500 font-medium'}`}>
+                    OA系统联通审批 (外接总线)
+                  </span>
+                </label>
+
+                <label className="flex items-center gap-2.5 cursor-pointer group">
+                  <input
+                    type="radio"
+                    name="approvalTypeGroup"
+                    value="platform"
+                    checked={approvalType === 'platform'}
+                    onChange={() => setApprovalType('platform')}
+                    className="w-4 h-4 text-blue-600 accent-blue-600 cursor-pointer border-slate-300"
+                  />
+                  <span className={`text-[13px] ${approvalType === 'platform' ? 'text-slate-900 font-bold' : 'text-slate-500 font-medium'}`}>
+                    科研平台系统内置审批 (推荐)
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            {/* Config panel when using Platform workflow */}
+            {exportApproval && approvalType === 'platform' && (
+              <div className="space-y-4 pt-4 border-t border-slate-150">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {customWorkflows.map((item) => {
+                    const isActive = selectedWorkflowId === item.id;
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={() => setSelectedWorkflowId(item.id)}
+                        className={`p-5 rounded-2xl border-2 text-left cursor-pointer transition-all flex flex-col justify-between relative hover:shadow-lg ${
+                          isActive
+                            ? 'bg-blue-50/50 border-blue-600 text-slate-950 shadow-md scale-[1.01] ring-1 ring-blue-600/20'
+                            : 'bg-white border-slate-200 text-slate-800 hover:border-slate-300'
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-center justify-between w-full">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs">💼</span>
+                              <input
+                                type="text"
+                                value={item.name}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedWorkflowId(item.id);
+                                }}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  setCustomWorkflows(prev => prev.map(flow => {
+                                    if (flow.id === item.id) {
+                                      return {
+                                        ...flow,
+                                        name: value,
+                                        workflow: {
+                                          ...flow.workflow,
+                                          name: `${value}节点流`
+                                        }
+                                      };
+                                    }
+                                    return flow;
+                                  }));
+                                }}
+                                className={`bg-transparent outline-none font-bold text-[13px] transition-colors pb-0.5 leading-tight w-[190px] text-left px-1 rounded ${
+                                  isActive
+                                    ? 'text-blue-900 focus:bg-blue-100/90'
+                                    : 'text-slate-900 focus:bg-slate-100'
+                                }`}
+                                title="点击即可直接修改该流程名称"
+                              />
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              <span className={`text-[10.5px] px-2 py-[1.5px] rounded-md font-bold ${
+                                isActive 
+                                  ? 'bg-blue-600 text-white shadow-sm' 
+                                  : item.modules.length > 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-250' : 'bg-slate-100 text-slate-400 border border-slate-200'
+                              }`}>
+                                {item.modules.length > 0 ? `${item.modules.length}个场景生效` : '空置未生效'}
+                              </span>
+
+                              {/* Dynamic deletion if has multiple workflows */}
+                              {customWorkflows.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const remaining = customWorkflows.filter(c => c.id !== item.id);
+                                    setCustomWorkflows(remaining);
+                                    if (selectedWorkflowId === item.id) {
+                                      setSelectedWorkflowId(remaining[0].id);
+                                    }
+                                    triggerToast(`已成功删除审批流 【${item.name}】 `);
+                                  }}
+                                  className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold bg-slate-100/80 text-slate-400 hover:bg-red-50 hover:text-red-500 border border-slate-200 transition-all"
+                                  title="删除此流程"
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="mt-4 space-y-2">
+                            <span className="text-[11px] block font-bold text-slate-500">
+                              关联生效入口：
+                            </span>
+                            <div className="grid grid-cols-2 gap-2 mt-1">
+                              {['数据中心', '数据检索', '患者收藏', '课题'].map(modName => {
+                                const isBoundHere = item.modules.includes(modName);
+                                const otherBoundFlow = customWorkflows.find(f => f.id !== item.id && f.modules.includes(modName));
+                                
+                                return (
+                                  <button
+                                    key={modName}
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedWorkflowId(item.id);
+                                      if (isBoundHere) {
+                                        setCustomWorkflows(prev => prev.map(flow => {
+                                          if (flow.id === item.id) {
+                                            return {
+                                              ...flow,
+                                              modules: flow.modules.filter(m => m !== modName)
+                                            };
+                                          }
+                                          return flow;
+                                        }));
+                                        triggerToast(`【${modName}】已取消关联！`);
+                                      } else {
+                                        setCustomWorkflows(prev => prev.map(flow => {
+                                          if (flow.id === item.id) {
+                                            return {
+                                              ...flow,
+                                              modules: [...flow.modules.filter(m => m !== modName), modName]
+                                            };
+                                          } else if (otherBoundFlow && flow.id === otherBoundFlow.id) {
+                                            return {
+                                              ...flow,
+                                              modules: flow.modules.filter(m => m !== modName)
+                                            };
+                                          }
+                                          return flow;
+                                        }));
+                                        triggerToast(otherBoundFlow 
+                                          ? `已将【${modName}】从【${otherBoundFlow.name}】改配至【${item.name}】`
+                                          : `【${modName}】已关联到【${item.name}】`);
+                                      }
+                                    }}
+                                    className={`flex items-center justify-between px-2.5 py-1.5 border rounded text-[11px] font-bold text-left transition-all ${
+                                      isBoundHere
+                                        ? 'bg-blue-600 border-blue-650 text-white shadow-sm'
+                                        : otherBoundFlow
+                                          ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                                          : 'bg-white hover:bg-slate-50 border-dashed border-slate-200 text-slate-500'
+                                    }`}
+                                  >
+                                    <span className="truncate">{modName}</span>
+                                    <span className="text-[9.5px] font-semibold scale-90 shrink-0 text-right opacity-90">
+                                      {isBoundHere ? '● 已关联' : otherBoundFlow ? '其他占用' : '○ 未关联'}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11.5px]">
+                          <span className={`flex items-center gap-1.5 font-bold ${isActive ? 'text-blue-600' : 'text-slate-450 font-medium'}`}>
+                            {isActive ? '🎯 已选中' : '点击切换'}
+                          </span>
+                          <span className={`px-2 py-[1px] text-[10px] rounded font-mono font-bold ${
+                            isActive ? 'bg-blue-100 border border-blue-200 text-blue-700' : 'bg-slate-100 text-slate-500 border border-slate-200'
+                          }`}>
+                            版本: {item.workflow.version}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newId = `flow_${Date.now()}`;
+                    const newIndex = customWorkflows.length + 1;
+                    const newName = `自定义数据导出审批流 #${newIndex}`;
+                    const newFlowObj = {
+                      id: newId,
+                      name: newName,
+                      version: 'V1',
+                      modules: [],
+                      workflow: {
+                        id: `wf_${newId}`,
+                        category: '数据导出',
+                        name: `${newName}设计版`,
+                        visible: true,
+                        visibleRange: '全员',
+                        formName: exportingDb.name || '通用科研库',
+                        lastPublish: '2026-05-21',
+                        version: 'V1'
+                      }
+                    };
+                    setCustomWorkflows(prev => [...prev, newFlowObj]);
+                    setSelectedWorkflowId(newId);
+                    triggerToast(`新建审批流【${newName}】成功！ 画面正自动下拉加载其设计卡片`);
+                  }}
+                  className="w-full py-4 rounded-xl border border-dashed border-indigo-300 hover:border-indigo-600 bg-indigo-50/25 hover:bg-slate-50 flex items-center justify-center gap-2 text-slate-700 hover:text-indigo-800 transition-all cursor-pointer"
+                >
+                  <span className="text-[12.5px] font-bold text-indigo-600">➕ 新建自定义数据导出审批流</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Underneath scientific-platform workflow space fitting Image 2 */}
+          {exportApproval && approvalType === 'platform' && (
+            <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-white mt-4 flex flex-col flex-1" style={{ minHeight: '850px' }}>
+              <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-600 flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                  工作流配置设计面板 
+                  <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200 font-extrabold text-xs">
+                    🎯 当前正在配置的对象：👉【{customWorkflows.find(f => f.id === selectedWorkflowId)?.name || '未选定'}】
+                  </span>
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  BPMN / Activiti 7 Compatible
+                </span>
+              </div>
+              <div className="flex-1 flex flex-col relative" style={{ minHeight: '800px' }}>
+                <WorkflowDesigner
+                  workflow={customWorkflows.find(f => f.id === selectedWorkflowId)?.workflow || customWorkflows[0].workflow}
+                  onSave={(updated) => {
+                    setCustomWorkflows(prev => prev.map(flow => {
+                      if (flow.id === selectedWorkflowId) {
+                        return {
+                          ...flow,
+                          workflow: updated
+                        };
+                      }
+                      return flow;
+                    }));
+                    const targetName = customWorkflows.find(f => f.id === selectedWorkflowId)?.name || '工作流';
+                    triggerToast(`【${targetName}】设计已成功保存并实时热部署！`);
+                  }}
+                  onClose={() => setExportingDb(null)}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Toast notifications */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-20 right-8 bg-[#1e293b] text-white text-xs px-4 py-2.5 rounded shadow-xl border border-slate-700 z-50 flex items-center gap-2 font-medium"
+          >
+            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>{toastMessage}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 🚀 SIX STATS BLOCKS HEADER ROW */}
+      <div className="grid grid-cols-6 gap-4 bg-white/40 p-4 rounded-xl border border-white/60 shadow-sm backdrop-blur-sm">
+        {/* Core Block 1: 科研专题库 */}
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-blue-50 border border-blue-100 rounded-lg flex items-center justify-center text-blue-600 shrink-0">
+            <Database className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="text-[11px] text-slate-400 font-bold tracking-wider">科研专题库</div>
+            <div className="flex items-baseline gap-1.5 leading-none mt-1">
+              <span className="text-[20px] font-bold font-mono tracking-tight">{totalSpecialsCount}</span>
+              <span className="text-[11px] text-slate-500 font-semibold">个</span>
+              <span className="text-[10px] text-emerald-500 flex items-center">↑</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Core Block 2: 数据时间跨度 */}
+        <div className="flex items-center gap-3 border-l border-slate-200/60 pl-4">
+          <div className="w-10 h-10 bg-blue-50 border border-blue-100 rounded-lg flex items-center justify-center text-blue-650 shrink-0">
+            <Calendar className="w-5 h-5 text-blue-500" />
+          </div>
+          <div>
+            <div className="text-[11px] text-slate-400 font-bold tracking-wider">数据时间跨度</div>
+            <div className="flex items-baseline gap-1 mt-1 leading-none">
+              <span className="text-[20px] font-bold font-mono tracking-tight">2,269</span>
+              <span className="text-[11px] text-slate-500 font-semibold">天</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Core Block 3: 患者总数 */}
+        <div className="flex items-center gap-3 border-l border-slate-200/60 pl-4">
+          <div className="w-10 h-10 bg-blue-50 border border-blue-100 rounded-lg flex items-center justify-center text-blue-600 shrink-0">
+            <User className="w-5 h-5 text-blue-500" />
+          </div>
+          <div>
+            <div className="text-[11px] text-slate-400 font-bold tracking-wider">患者总数</div>
+            <div className="flex items-baseline gap-1 mt-1 leading-none">
+              <span className="text-[20px] font-bold font-mono tracking-tight">{totalPatients.toLocaleString()}</span>
+              <span className="text-[11px] text-slate-500 font-semibold">人</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Core Block 4: 病历总数 */}
+        <div className="flex items-center gap-3 border-l border-slate-200/60 pl-4">
+          <div className="w-10 h-10 bg-blue-50 border border-blue-100 rounded-lg flex items-center justify-center text-blue-650 shrink-0">
+            <Clipboard className="w-5 h-5 text-blue-550" />
+          </div>
+          <div>
+            <div className="text-[11px] text-slate-400 font-bold tracking-wider">病历总数</div>
+            <div className="flex items-baseline gap-1 mt-1 leading-none">
+              <span className="text-[20px] font-bold font-mono tracking-tight">{totalRecords.toLocaleString()}</span>
+              <span className="text-[11px] text-slate-500 font-semibold">份</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Core Block 5: 覆盖科室数 */}
+        <div className="flex items-center gap-3 border-l border-slate-200/60 pl-4">
+          <div className="w-10 h-10 bg-blue-50 border border-blue-100 rounded-lg flex items-center justify-center text-blue-600 shrink-0">
+            <Building2 className="w-5 h-5 text-blue-550" />
+          </div>
+          <div>
+            <div className="text-[11px] text-slate-400 font-bold tracking-wider">覆盖科室数</div>
+            <div className="flex items-baseline gap-1.5 leading-none mt-1">
+              <span className="text-[20px] font-bold font-mono tracking-tight">{totalDepartments}</span>
+              <span className="text-[11px] text-slate-500 font-semibold">个</span>
+              <span className="text-[10px] text-emerald-500 flex items-center">↑</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Core Block 6: 覆盖用户数 */}
+        <div className="flex items-center gap-3 border-l border-slate-200/60 pl-4">
+          <div className="w-10 h-10 bg-blue-50 border border-blue-100 rounded-lg flex items-center justify-center text-blue-600 shrink-0">
+            <Users className="w-5 h-5 text-blue-550" />
+          </div>
+          <div>
+            <div className="text-[11px] text-slate-400 font-bold tracking-wider">覆盖用户数</div>
+            <div className="flex items-baseline gap-1.5 leading-none mt-1">
+              <span className="text-[20px] font-bold font-mono tracking-tight">{totalActiveUsers}</span>
+              <span className="text-[11px] text-slate-500 font-semibold">个</span>
+              <span className="text-[10px] text-emerald-500 flex items-center">↑</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 🚀 SEARCH BAR & NEW SPECIAL BUTTON ROW */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2 max-w-sm flex-1">
+          <div className="relative flex-1">
+            <input 
+              type="text" 
+              placeholder="请输入关键检索..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-white border border-slate-300 rounded px-3 py-1.5 text-xs outline-none focus:border-blue-500 placeholder-slate-400 font-medium"
+            />
+            {searchQuery && (
+              <X 
+                className="absolute right-2.5 top-2.5 w-3 h-3 text-slate-400 hover:text-slate-600 cursor-pointer" 
+                onClick={() => setSearchQuery('')}
+              />
+            )}
+          </div>
+          <button 
+            onClick={handleSearch}
+            className="px-4 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded text-xs font-bold text-slate-700 transition-colors cursor-pointer shrink-0"
+          >
+            搜索
+          </button>
+        </div>
+
+        <button 
+          onClick={() => { setEditingDb(null); setShowAddModal(true); }}
+          className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-xs shadow-sm transition-all cursor-pointer"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>新增专病库</span>
+        </button>
+      </div>
+
+      {/* 🚀 GRIDS OF DATABASE SOURCES */}
+      <div className="grid grid-cols-4 gap-4 pb-12">
+        {filteredDatabases.map((db) => (
+          <div 
+            key={db.id}
+            className="bg-white border border-slate-200/90 rounded-xl overflow-hidden hover:shadow-md transition-all duration-200 relative flex flex-col justify-between"
+          >
+            {/* Absolute wave graphics background placeholder */}
+            <div className="absolute top-0 right-0 left-0 h-16 bg-gradient-to-b from-blue-50/40 via-blue-50/10 to-transparent pointer-events-none" />
+
+            <div className="p-4 space-y-3 flex-1 flex flex-col relative z-10">
+              {/* Card Title & Icon Row */}
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border shadow-xs ${
+                    db.isCustomIcon 
+                      ? 'bg-blue-100 border-blue-200 text-blue-600' 
+                      : 'bg-blue-50 border-blue-100 text-blue-500'
+                  }`}>
+                    {db.isCustomIcon ? (
+                      <Biohazard className="w-4 h-4 text-blue-600 animate-pulse" />
+                    ) : (
+                      <Plus className="w-4 h-4 text-blue-600 font-bold" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-[14px] text-slate-800 leading-tight tracking-tight">{db.name}</h3>
+                    <div className="text-[10px] text-slate-400 mt-0.5 leading-snug">
+                      管理员: <span className="text-slate-500 font-medium">{db.admins.join(', ')}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Dropdown Options */}
+                <div className="relative">
+                  <button 
+                    onClick={() => setActiveMenuId(activeMenuId === db.id ? null : db.id)}
+                    className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-700 cursor-pointer transition-colors"
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                  </button>
+
+                  <AnimatePresence>
+                    {activeMenuId === db.id && (
+                      <>
+                        <div className="fixed inset-0 z-30" onClick={() => setActiveMenuId(null)} />
+                        <motion.div 
+                          initial={{ opacity: 0, scale: 0.95, y: -5 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.95, y: -5 }}
+                          className="absolute right-0 top-6 w-24 bg-white border border-slate-200 rounded shadow-lg py-1 z-40 text-xs"
+                        >
+                          <button 
+                            onClick={() => handleStartEdit(db)}
+                            className="w-full text-left px-3 py-1.5 hover:bg-slate-50 text-slate-600 flex items-center gap-1.5 font-bold"
+                          >
+                            <Edit2 className="w-3 h-3 text-slate-400" />
+                            <span>编辑</span>
+                          </button>
+                          <button 
+                            onClick={() => handleExportDbConfig(db)}
+                            className="w-full text-left px-3 py-1.5 hover:bg-blue-50 text-slate-600 flex items-center gap-1.5 font-bold"
+                          >
+                            <Download className="w-3 h-3 text-blue-500" />
+                            <span>导出配置</span>
+                          </button>
+                        </motion.div>
+                      </>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
+
+              {/* Time Span Information lines */}
+              <div className="space-y-1 bg-slate-50/50 p-2 rounded-lg border border-slate-100/60 text-[11px] leading-tight flex-1 flex flex-col justify-center">
+                <div className="flex justify-between items-center text-slate-400">
+                  <span>就诊时间跨度</span>
+                  <span className="font-mono text-slate-700 font-semibold">{db.timeSpan || '—'}</span>
+                </div>
+                <div className="flex justify-between items-center text-slate-400">
+                  <span>最近更新时间</span>
+                  <span className="font-mono text-slate-700 font-semibold">{db.lastUpdated || '—'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Tri-Stats Panel Indicators */}
+            <div className="border-t border-slate-150 p-3 px-4 bg-slate-50/30 grid grid-cols-3 gap-1 text-center select-none shrink-0 rounded-b-xl">
+              <div>
+                <span className="text-[10px] text-slate-400 block font-medium leading-none mb-1">用户数</span>
+                <span className="text-[13px] font-extrabold text-slate-800 font-mono leading-none">{db.usersCount.toLocaleString()}</span>
+              </div>
+              <div className="border-l border-slate-150">
+                <span className="text-[10px] text-slate-400 block font-medium leading-none mb-1">患者数</span>
+                <span className="text-[13px] font-extrabold text-slate-800 font-mono leading-none">
+                  {db.patientsCount ? db.patientsCount.toLocaleString() : '—'}
+                </span>
+              </div>
+              <div className="border-l border-slate-150">
+                <span className="text-[10px] text-slate-400 block font-medium leading-none mb-1">病历数</span>
+                <span className="text-[13px] font-extrabold text-slate-800 font-mono leading-none">
+                  {db.recordsCount ? db.recordsCount.toLocaleString() : '—'}
+                </span>
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {filteredDatabases.length === 0 && (
+          <div className="col-span-4 py-24 text-center text-slate-400 text-xs">
+            未发现与搜索词匹配的专病数据库模型
+          </div>
+        )}
+      </div>
+
+      {/* --- ADD / EDIT SPECIAL MODAL SHEET --- */}
+      <AnimatePresence>
+        {showAddModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowAddModal(false)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden relative z-10 flex flex-col max-h-[92vh]"
+            >
+              <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                <div className="flex items-center gap-2">
+                  <Plus className="w-4 h-4 text-blue-600" />
+                  <h3 className="font-bold text-slate-800 text-xs">{editingDb ? '编辑科研专病数据库' : '创建新增专病科研库'}</h3>
+                </div>
+                <button 
+                  onClick={() => setShowAddModal(false)}
+                  className="p-1 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmitAdd} className="p-5 overflow-y-auto space-y-4">
+                {/* Form fields */}
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">名称*</label>
+                  <input 
+                    type="text" 
+                    value={newDbName}
+                    onChange={(e) => setNewDbName(e.target.value)}
+                    placeholder="例如: 慢阻肺公共物理队列科研专病库"
+                    className="w-full border border-slate-200 rounded px-2.5 py-1.5 text-xs outline-none focus:border-blue-500 font-semibold"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">平台管理员* (逗号分隔)</label>
+                  <input 
+                    type="text" 
+                    value={newDbAdmins}
+                    onChange={(e) => setNewDbAdmins(e.target.value)}
+                    placeholder="管理人员，例如: YS,吴汶芮,陈静"
+                    className="w-full border border-slate-200 rounded px-2.5 py-1.5 text-xs outline-none focus:border-blue-500 font-semibold"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-slate-400 block">开始周期时间段</label>
+                    <input 
+                      type="date"
+                      value={newDbStartDate}
+                      onChange={(e) => setNewDbStartDate(e.target.value)}
+                      className="w-full border border-slate-200 rounded px-2.5 py-1 text-xs outline-none focus:border-blue-500 font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-slate-400 block">截至周期时间段</label>
+                    <input 
+                      type="date"
+                      value={newDbEndDate}
+                      onChange={(e) => setNewDbEndDate(e.target.value)}
+                      className="w-full border border-slate-200 rounded px-2.5 py-1 text-xs outline-none focus:border-blue-500 font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3 bg-slate-50 p-4 rounded-lg border border-slate-100">
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-500 font-bold block">用户数</label>
+                    <input 
+                      type="number"
+                      min={0}
+                      value={newDbUsers}
+                      onChange={(e) => setNewDbUsers(Number(e.target.value))}
+                      className="w-full border border-slate-200 rounded px-2 py-1 text-xs text-center outline-none bg-white font-semibold"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-500 font-bold block">患者总数 (人)</label>
+                    <input 
+                      type="number"
+                      min={0}
+                      value={newDbPatients}
+                      onChange={(e) => setNewDbPatients(Number(e.target.value))}
+                      className="w-full border border-slate-200 rounded px-2 py-1 text-xs text-center outline-none bg-white font-semibold"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-500 font-bold block">病历总份数 (份)</label>
+                    <input 
+                      type="number"
+                      min={0}
+                      value={newDbRecords}
+                      onChange={(e) => setNewDbRecords(Number(e.target.value))}
+                      className="w-full border border-slate-200 rounded px-2 py-1 text-xs text-center outline-none bg-white font-semibold"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                  <button 
+                    type="button" 
+                    onClick={() => setShowAddModal(false)}
+                    className="px-4 py-1.5 bg-slate-100 hover:bg-slate-200 rounded text-xs font-bold text-slate-600 cursor-pointer"
+                  >
+                    取消
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-bold shadow-sm cursor-pointer"
+                  >
+                    {editingDb ? '应用编辑配置' : '确认新增专病库'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
