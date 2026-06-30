@@ -21,7 +21,12 @@ import {
   ArrowRight,
   ChevronDown,
   Calendar,
-  Power
+  Power,
+  ZoomIn,
+  ZoomOut,
+  Maximize,
+  Download,
+  CheckSquare
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -599,145 +604,325 @@ export const ApprovalCenter = ({ workflows }: ApprovalCenterProps) => {
               )}
             </AnimatePresence>
 
-            <div className="bg-slate-50/50 rounded-lg shadow-sm p-6 border border-slate-200 min-h-[600px] sticky top-6">
-              {/* Timeline container */}
-              <div className="space-y-6 relative ml-2">
+            <div className="bg-white rounded-lg shadow-sm border border-slate-200 sticky top-6 overflow-hidden flex flex-col">
+              {/* Header inside right panel */}
+              <div className="flex items-center justify-between px-4 py-3.5 bg-slate-50/80 border-b border-slate-200 select-none">
+                <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <span className="w-1.5 h-3 bg-blue-600 rounded-full" />
+                  流程名称: 会签
+                </span>
                 
-                {/* Node 1: 开始 */}
-                <div className="relative flex gap-4">
-                  <div className="absolute top-8 left-[11px] bottom-[-24px] w-[2px] bg-slate-200" />
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center relative z-10">
-                     <User className="w-3.5 h-3.5" />
-                     <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-500 rounded-full border-[2px] border-white flex items-center justify-center">
-                       <Check className="w-2 h-2 text-white" />
-                     </div>
-                  </div>
-                  <div className="flex-1 pb-2">
-                    <div className="flex items-center justify-between">
-                      <div className="font-bold text-slate-800 text-[14px]">开始</div>
-                      <div className="text-[11px] text-slate-400 font-mono">2026-05-19 09:57:15</div>
-                    </div>
-                    <div className="mt-2.5 flex flex-wrap gap-2">
-                      <div className="flex items-center gap-1.5 px-2.5 py-0.5 bg-white rounded-full border border-slate-200/50 shadow-sm">
-                        <div className="w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center text-[9px] font-bold">g</div>
-                        <span className="text-[12px] text-slate-700">guest1</span>
-                      </div>
-                    </div>
-                  </div>
+                {/* Legend statuses */}
+                <div className="flex items-center gap-2">
+                  <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-500 border border-slate-200 rounded font-medium scale-90 origin-right">
+                    未完成
+                  </span>
+                  <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 bg-[#fffbeb] text-amber-600 border border-amber-200 rounded font-medium scale-90 origin-right">
+                    进行中
+                  </span>
+                  <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 bg-emerald-50/80 text-emerald-600 border border-emerald-200 rounded font-medium scale-90 origin-right">
+                    已完成
+                  </span>
                 </div>
+                
+                {/* Zoom buttons */}
+                <div className="flex items-center gap-1">
+                  <button className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded border border-slate-200/60 bg-white transition-colors cursor-pointer" title="放大">
+                    <ZoomIn className="w-3.5 h-3.5" />
+                  </button>
+                  <button className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded border border-slate-200/60 bg-white transition-colors cursor-pointer" title="自适应">
+                    <Maximize className="w-3.5 h-3.5" />
+                  </button>
+                  <button className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded border border-slate-200/60 bg-white transition-colors cursor-pointer" title="缩小">
+                    <ZoomOut className="w-3.5 h-3.5" />
+                  </button>
+                  <button className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded border border-slate-200/60 bg-white transition-colors cursor-pointer" title="导出流程图">
+                    <Download className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
 
-                {/* Node 2: 遗传办公室审批 */}
-                <div className="relative flex gap-4">
-                  <div className="absolute top-8 left-[11px] bottom-[-24px] w-[2px] bg-slate-200" />
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center relative z-10">
-                     <User className="w-3.5 h-3.5" />
-                     <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-slate-400 rounded-full border-[2px] border-white flex items-center justify-center">
-                       <Clock className="w-2 h-2 text-white" />
-                     </div>
-                  </div>
-                  <div className="flex-1 pb-2">
-                    <div className="font-bold text-slate-800 text-[14px]">遗传办公室审批</div>
-                    <div className="mt-2.5 flex flex-wrap gap-2">
-                      <div className="flex items-center gap-1.5 px-2.5 py-0.5 bg-white rounded-full border border-slate-200/50 shadow-sm">
-                        <div className="w-4 h-4 rounded-full bg-white border border-slate-200 text-slate-300 flex items-center justify-center overflow-hidden">
-                           <User className="w-2.5 h-2.5" />
-                        </div>
-                        <span className="text-[12px] text-slate-600">yangliu</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 px-2.5 py-0.5 bg-white rounded-full border border-slate-200/50 shadow-sm">
-                        <div className="w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center text-[9px] font-bold">M</div>
-                        <span className="text-[12px] text-slate-700">MrZhang</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 px-2.5 py-0.5 bg-white rounded-full border border-slate-200/50 shadow-sm">
-                        <div className="w-4 h-4 rounded-full bg-slate-300 text-white flex items-center justify-center overflow-hidden"><img src="https://i.pravatar.cc/100?img=11" alt="admin" /></div>
-                        <span className="text-[12px] text-slate-700">admin</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 px-2.5 py-0.5 bg-white rounded-full border border-slate-200/50 shadow-sm">
-                        <div className="w-4 h-4 rounded-full bg-slate-300 text-white flex items-center justify-center overflow-hidden"><img src="https://i.pravatar.cc/100?img=12" alt="tianhy" /></div>
-                        <span className="text-[12px] text-slate-700">tianhy</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+              {/* Dotted Canvas */}
+              <div className="relative w-full h-[710px] overflow-hidden bg-[radial-gradient(#e2e8f0_1.2px,transparent_1.2px)] [background-size:16px_16px] bg-slate-50/15 flex flex-col items-center justify-start">
+                 
+                 {/* SVG Connection Paths */}
+                 <svg className="absolute inset-0 w-full h-full pointer-events-none" xmlns="http://www.w3.org/2000/svg">
+                   <defs>
+                     <marker id="arrow-gray" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                       <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#94a3b8" />
+                     </marker>
+                     <marker id="arrow-green" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                       <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#10b981" />
+                     </marker>
+                     <marker id="arrow-orange" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                       <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#fbbf24" />
+                     </marker>
+                     <marker id="arrow-red" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                       <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#ef4444" />
+                     </marker>
+                   </defs>
 
-                {/* Node 3: 课题PI审批 */}
-                <div className="relative flex gap-4">
-                  <div className="absolute top-8 left-[11px] bottom-[-24px] w-[2px] bg-slate-200" />
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center relative z-10">
-                     <User className="w-3.5 h-3.5" />
-                     <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-slate-400 rounded-full border-[2px] border-white flex items-center justify-center">
-                       <Clock className="w-2 h-2 text-white" />
-                     </div>
-                  </div>
-                  <div className="flex-1 pb-2">
-                    <div className="font-bold text-slate-800 text-[14px]">课题PI审批</div>
-                    <div className="mt-2.5 flex flex-wrap gap-2">
-                      <div className="flex items-center gap-1.5 px-2.5 py-0.5 bg-white rounded-full border border-slate-200/50 shadow-sm">
-                        <div className="w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center text-[9px] font-bold">a</div>
-                        <span className="text-[12px] text-slate-700">admin</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                   {/* Line 1: 开始 -> 待提交 */}
+                   <path d="M 180 70 L 180 110" stroke="#10b981" strokeWidth="2" fill="none" markerEnd="url(#arrow-green)" />
 
-                {/* Node 4: 科教科审批 */}
-                <div className="relative flex gap-4">
-                  <div className="absolute top-8 left-[11px] bottom-[-24px] w-[2px] bg-slate-200" />
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center relative z-10">
-                     <User className="w-3.5 h-3.5" />
-                     <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-slate-400 rounded-full border-[2px] border-white flex items-center justify-center">
-                       <Clock className="w-2 h-2 text-white" />
-                     </div>
-                  </div>
-                  <div className="flex-1 pb-2">
-                    <div className="font-bold text-slate-800 text-[14px]">科教科审批</div>
-                    <div className="mt-2.5 flex flex-wrap gap-2">
-                      <div className="flex items-center gap-1.5 px-2.5 py-0.5 bg-white rounded-full border border-slate-200/50 shadow-sm">
-                        <div className="w-4 h-4 rounded-full bg-white border border-slate-200 text-slate-300 flex items-center justify-center overflow-hidden">
-                           <User className="w-2.5 h-2.5" />
-                        </div>
-                        <span className="text-[12px] text-slate-600">yangliu</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 px-2.5 py-0.5 bg-white rounded-full border border-slate-200/50 shadow-sm">
-                        <div className="w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center text-[9px] font-bold">M</div>
-                        <span className="text-[12px] text-slate-700">MrZhang</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                   {/* Line 2: 待提交 -> 组长审批 */}
+                   <path 
+                     d="M 180 190 L 180 250" 
+                     stroke={
+                       selectedExportDetail.status === '待审批' && selectedExportDetail.currentApprovalNode === '部门主管审批'
+                         ? '#10b981' 
+                         : (selectedExportDetail.status === '审批通过' || selectedExportDetail.currentApprovalNode === '样本库主管预审' || selectedExportDetail.currentApprovalNode === '流程结束')
+                           ? '#10b981'
+                           : '#cbd5e1'
+                     } 
+                     strokeWidth="2" 
+                     fill="none" 
+                     markerEnd={
+                       selectedExportDetail.status === '待审批' && selectedExportDetail.currentApprovalNode === '部门主管审批'
+                         ? 'url(#arrow-green)'
+                         : (selectedExportDetail.status === '审批通过' || selectedExportDetail.currentApprovalNode === '样本库主管预审' || selectedExportDetail.currentApprovalNode === '流程结束')
+                           ? 'url(#arrow-green)'
+                           : 'url(#arrow-gray)'
+                     } 
+                   />
 
-                {/* Node 5: 信息科审批 */}
-                <div className="relative flex gap-4">
-                  <div className="absolute top-8 left-[11px] bottom-[-24px] w-[2px] bg-slate-200" />
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center relative z-10">
-                     <User className="w-3.5 h-3.5" />
-                     <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-slate-400 rounded-full border-[2px] border-white flex items-center justify-center">
-                       <Clock className="w-2 h-2 text-white" />
-                     </div>
-                  </div>
-                  <div className="flex-1 pb-2">
-                    <div className="font-bold text-slate-800 text-[14px]">信息科审批</div>
-                    <div className="mt-2.5 flex flex-wrap gap-2">
-                      <div className="flex items-center gap-1.5 px-2.5 py-0.5 bg-white rounded-full border border-slate-200/50 shadow-sm">
-                        <div className="w-4 h-4 rounded-full bg-slate-300 text-white flex items-center justify-center overflow-hidden"><img src="https://i.pravatar.cc/100?img=12" alt="tianhy" /></div>
-                        <span className="text-[12px] text-slate-700">tianhy</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                   {/* Line 3: 组长审批 -> 部门经理审批 */}
+                   <path 
+                     d="M 180 330 L 180 390" 
+                     stroke={
+                       selectedExportDetail.status === '待审批' && selectedExportDetail.currentApprovalNode === '样本库主管预审'
+                         ? '#10b981'
+                         : (selectedExportDetail.status === '审批通过' || selectedExportDetail.currentApprovalNode === '流程结束')
+                           ? '#10b981'
+                           : '#cbd5e1'
+                     } 
+                     strokeWidth="2" 
+                     fill="none" 
+                     markerEnd={
+                       selectedExportDetail.status === '待审批' && selectedExportDetail.currentApprovalNode === '样本库主管预审'
+                         ? 'url(#arrow-green)'
+                         : (selectedExportDetail.status === '审批通过' || selectedExportDetail.currentApprovalNode === '流程结束')
+                           ? 'url(#arrow-green)'
+                           : 'url(#arrow-gray)'
+                     } 
+                   />
 
-                {/* Node 6: 结束 */}
-                <div className="relative flex gap-4">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center relative z-10">
-                     <Power className="w-3.5 h-3.5" />
-                     <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-slate-400 rounded-full border-[2px] border-white flex items-center justify-center">
-                       <Clock className="w-2 h-2 text-white" />
+                   {/* Line 4: 部门经理审批 -> hr审批 */}
+                   <path 
+                     d="M 180 470 L 180 530" 
+                     stroke={
+                       (selectedExportDetail.status === '审批通过' || selectedExportDetail.currentApprovalNode === '流程结束')
+                         ? '#10b981'
+                         : '#cbd5e1'
+                     } 
+                     strokeWidth="2" 
+                     fill="none" 
+                     markerEnd={
+                       (selectedExportDetail.status === '审批通过' || selectedExportDetail.currentApprovalNode === '流程结束')
+                         ? 'url(#arrow-green)'
+                         : 'url(#arrow-gray)'
+                     } 
+                   />
+
+                   {/* Line 5: hr审批 -> 结束 */}
+                   <path 
+                     d="M 180 610 L 180 650" 
+                     stroke={
+                       (selectedExportDetail.status === '审批通过' || selectedExportDetail.currentApprovalNode === '流程结束')
+                         ? '#10b981'
+                         : '#cbd5e1'
+                     } 
+                     strokeWidth="2" 
+                     fill="none" 
+                     markerEnd={
+                       (selectedExportDetail.status === '审批通过' || selectedExportDetail.currentApprovalNode === '流程结束')
+                         ? 'url(#arrow-green)'
+                         : 'url(#arrow-gray)'
+                     } 
+                   />
+
+                   {/* Reject Loop: 部门经理审批 -> 待提交 (Left side connector) */}
+                   <path 
+                     d="M 80 430 L 45 430 C 35 430 30 425 30 415 L 30 165 C 30 155 35 150 45 150 L 80 150" 
+                     stroke={selectedExportDetail.status === '已驳回' ? '#ef4444' : '#cbd5e1'} 
+                     strokeWidth={selectedExportDetail.status === '已驳回' ? '2' : '1.5'} 
+                     strokeDasharray={selectedExportDetail.status === '已驳回' ? 'none' : '4,4'}
+                     fill="none" 
+                     markerEnd={selectedExportDetail.status === '已驳回' ? 'url(#arrow-red)' : 'url(#arrow-gray)'} 
+                   />
+                 </svg>
+
+                 {/* Node 1: 开始 */}
+                 <div 
+                   className="absolute rounded-full flex items-center justify-center font-bold text-xs shadow-md select-none transition-all duration-300"
+                   style={{ left: '160px', top: '30px', width: '40px', height: '40px', background: 'radial-gradient(circle, #ecfdf5 0%, #a7f3d0 100%)', border: '2px solid #10b981', color: '#047857', boxShadow: '0 0 12px rgba(16,185,129,0.35)' }}
+                 >
+                   开始
+                 </div>
+
+                 {/* Node 2: 待提交 */}
+                 <div 
+                   className="absolute rounded-xl flex items-center justify-center relative shadow-sm border transition-all duration-300"
+                   style={{ left: '80px', top: '110px', width: '200px', height: '80px', backgroundColor: '#f0fdf4', borderColor: '#10b981' }}
+                 >
+                   {/* Icon badge top left */}
+                   <div className="absolute top-2.5 left-2.5 w-5 h-5 rounded-md flex items-center justify-center bg-emerald-500 text-white shadow-sm">
+                     <Check className="w-3 h-3 stroke-[3px]" />
+                   </div>
+                   <span className="font-bold text-sm text-emerald-800 tracking-wide select-none">待提交</span>
+                 </div>
+
+                 {/* Node 3: 组长审批 */}
+                 {(() => {
+                   const isActive = selectedExportDetail.status === '待审批' && selectedExportDetail.currentApprovalNode === '部门主管审批';
+                   const isCompleted = selectedExportDetail.status === '审批通过' || selectedExportDetail.currentApprovalNode === '样本库主管预审' || selectedExportDetail.currentApprovalNode === '流程结束';
+                   
+                   let bg = '#f8fafc';
+                   let border = '#cbd5e1';
+                   let text = '#475569';
+                   let iconBg = '#94a3b8';
+                   let icon = <Clock className="w-3 h-3 stroke-[2.5px]" />;
+                   let pulseShadow = '';
+
+                   if (isCompleted) {
+                     bg = '#f0fdf4';
+                     border = '#10b981';
+                     text = '#047857';
+                     iconBg = '#10b981';
+                     icon = <Check className="w-3 h-3 stroke-[3px]" />;
+                   } else if (isActive) {
+                     bg = '#fffbeb';
+                     border = '#f59e0b';
+                     text = '#b45309';
+                     iconBg = '#fbbf24';
+                     icon = <Check className="w-3 h-3 stroke-[3px]" />; // Yellow check as in image
+                     pulseShadow = 'shadow-[0_0_15px_rgba(245,158,11,0.25)]';
+                   }
+
+                   return (
+                     <div 
+                       className={`absolute rounded-xl flex items-center justify-center shadow-sm border transition-all duration-300 ${pulseShadow}`}
+                       style={{ left: '80px', top: '250px', width: '200px', height: '80px', backgroundColor: bg, borderColor: border }}
+                     >
+                       <div className="absolute top-2.5 left-2.5 w-5 h-5 rounded-md flex items-center justify-center text-white shadow-sm" style={{ backgroundColor: iconBg }}>
+                         {icon}
+                       </div>
+                       <span className="font-bold text-sm tracking-wide select-none" style={{ color: text }}>组长审批</span>
                      </div>
-                  </div>
-                  <div className="flex-1 pb-2">
-                    <div className="font-bold text-slate-800 text-[14px] mt-0.5">结束</div>
-                  </div>
-                </div>
+                   );
+                 })()}
+
+                 {/* Node 4: 部门经理审批 */}
+                 {(() => {
+                   const isRejected = selectedExportDetail.status === '已驳回';
+                   const isActive = selectedExportDetail.status === '待审批' && selectedExportDetail.currentApprovalNode === '样本库主管预审';
+                   const isCompleted = selectedExportDetail.status === '审批通过' || selectedExportDetail.currentApprovalNode === '流程结束';
+                   
+                   let bg = '#f8fafc';
+                   let border = '#cbd5e1';
+                   let text = '#475569';
+                   let iconBg = '#94a3b8';
+                   let icon = <Clock className="w-3 h-3 stroke-[2.5px]" />;
+                   let pulseShadow = '';
+
+                   if (isCompleted) {
+                     bg = '#f0fdf4';
+                     border = '#10b981';
+                     text = '#047857';
+                     iconBg = '#10b981';
+                     icon = <Check className="w-3 h-3 stroke-[3px]" />;
+                   } else if (isRejected) {
+                     bg = '#fef2f2';
+                     border = '#f87171';
+                     text = '#b91c1c';
+                     iconBg = '#ef4444';
+                     icon = <X className="w-3 h-3 stroke-[3.5px]" />;
+                   } else if (isActive) {
+                     bg = '#fffbeb';
+                     border = '#f59e0b';
+                     text = '#b45309';
+                     iconBg = '#fbbf24';
+                     icon = <Check className="w-3 h-3 stroke-[3px]" />;
+                     pulseShadow = 'shadow-[0_0_15px_rgba(245,158,11,0.25)]';
+                   }
+
+                   return (
+                     <div 
+                       className={`absolute rounded-xl flex items-center justify-center shadow-sm border transition-all duration-300 ${pulseShadow}`}
+                       style={{ left: '80px', top: '390px', width: '200px', height: '80px', backgroundColor: bg, borderColor: border }}
+                     >
+                       <div className="absolute top-2.5 left-2.5 w-5 h-5 rounded-md flex items-center justify-center text-white shadow-sm" style={{ backgroundColor: iconBg }}>
+                         {icon}
+                       </div>
+                       <span className="font-bold text-sm tracking-wide select-none" style={{ color: text }}>部门经理审批</span>
+                     </div>
+                   );
+                 })()}
+
+                 {/* Node 5: hr审批 */}
+                 {(() => {
+                   const isCompleted = selectedExportDetail.status === '审批通过' || selectedExportDetail.currentApprovalNode === '流程结束';
+                   
+                   let bg = '#f8fafc';
+                   let border = '#cbd5e1';
+                   let text = '#475569';
+                   let iconBg = '#94a3b8';
+                   let icon = <Clock className="w-3 h-3 stroke-[2.5px]" />;
+
+                   if (isCompleted) {
+                     bg = '#f0fdf4';
+                     border = '#10b981';
+                     text = '#047857';
+                     iconBg = '#10b981';
+                     icon = <Check className="w-3 h-3 stroke-[3px]" />;
+                   }
+
+                   return (
+                     <div 
+                       className="absolute rounded-xl flex items-center justify-center shadow-sm border transition-all duration-300"
+                       style={{ left: '80px', top: '530px', width: '200px', height: '80px', backgroundColor: bg, borderColor: border }}
+                     >
+                       <div className="absolute top-2.5 left-2.5 w-5 h-5 rounded-md flex items-center justify-center text-white shadow-sm" style={{ backgroundColor: iconBg }}>
+                         {icon}
+                       </div>
+                       <span className="font-bold text-sm tracking-wide select-none" style={{ color: text }}>hr审批</span>
+                     </div>
+                   );
+                 })()}
+
+                 {/* Node 6: 结束 */}
+                 {(() => {
+                   const isCompleted = selectedExportDetail.status === '审批通过' || selectedExportDetail.currentApprovalNode === '流程结束';
+                   
+                   return (
+                     <div 
+                       className="absolute flex items-center justify-center select-none transition-all duration-300"
+                       style={{ 
+                         left: '160px', 
+                         top: '650px', 
+                         width: '40px', 
+                         height: '40px',
+                         borderRadius: '50%',
+                         border: isCompleted ? '3px solid #a7f3d0' : '3px solid #e2e8f0',
+                         backgroundColor: isCompleted ? '#f0fdf4' : '#f8fafc',
+                         boxShadow: isCompleted ? '0 0 10px rgba(16,185,129,0.25)' : 'none'
+                       }}
+                     >
+                       <div 
+                         className="flex items-center justify-center rounded-full font-bold select-none text-[9px]"
+                         style={{ 
+                           width: '26px', 
+                           height: '26px', 
+                           backgroundColor: isCompleted ? '#10b981' : '#94a3b8',
+                           color: '#ffffff'
+                         }}
+                       >
+                         结束
+                       </div>
+                     </div>
+                   );
+                 })()}
+
               </div>
             </div>
           </div>
@@ -1519,7 +1704,7 @@ export const ApprovalCenter = ({ workflows }: ApprovalCenterProps) => {
                           <th className="py-3 px-4 w-[80px]">申请人</th>
                           <th className="py-3 px-4 w-[125px]">申请时间</th>
                           <th className="py-3 px-4 w-[90px]">审批状态</th>
-                          <th className="py-3 px-4 w-[100px]">当前节点</th>
+                          <th className="py-3 px-4 w-[100px]">审批人</th>
                           <th className="py-3 px-4">审批意见</th>
                           <th className="py-3 px-4 w-[125px]">审批时间</th>
                           <th className="py-3 px-4 text-center w-[120px]">操作</th>
@@ -1586,7 +1771,12 @@ export const ApprovalCenter = ({ workflows }: ApprovalCenterProps) => {
                             <td className="py-2.5 px-4 text-slate-800 font-semibold">{item.applicant}</td>
                             <td className="py-2.5 px-4 text-slate-450 font-mono text-[11px]">{item.applyTime}</td>
                             <td className="py-2.5 px-4 text-slate-600 font-medium">{item.status}</td>
-                            <td className="py-2.5 px-4 text-slate-700 font-semibold">{item.currentApprovalNode}</td>
+                            <td className="py-2.5 px-4 text-slate-700 font-semibold">
+                              {item.currentApprovalNode === '部门主管审批' ? '部门主管' : 
+                               item.currentApprovalNode === '样本库主管预审' ? '样本库主管' : 
+                               item.currentApprovalNode === '流程结束' ? '部门主管' : 
+                               item.currentApprovalNode}
+                            </td>
                             <td className="py-2.5 px-4 text-slate-450 truncate max-w-[100px]" title={item.opinion}>{item.opinion}</td>
                             <td className="py-2.5 px-4 text-slate-450 font-mono text-[11px]">{item.approveTime}</td>
                             <td className="py-2.5 px-4" onClick={(e) => e.stopPropagation()}>
