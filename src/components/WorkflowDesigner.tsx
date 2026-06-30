@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Settings, 
   ChevronDown, 
@@ -6,6 +7,7 @@ import {
   ChevronLeft,
   RotateCcw, 
   User, 
+  Users,
   X, 
   Plus, 
   Eye, 
@@ -17,7 +19,20 @@ import {
   Square, 
   Maximize2,
   CheckCircle2,
-  Trash2
+  Trash2,
+  Tag,
+  Pencil,
+  Network,
+  Computer,
+  Link,
+  FileText,
+  FileEdit,
+  GitFork,
+  Search,
+  HelpCircle,
+  Info,
+  Sliders,
+  Calendar
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -35,13 +50,20 @@ export interface WorkflowItem {
 
 interface BPMNNode {
   id: string;
-  type: 'start' | 'end' | 'gateway-or' | 'gateway-and' | 'task';
+  type: 'start' | 'end' | 'gateway-or' | 'gateway-and' | 'gateway-inclusive' | 'gateway-exclusive' | 'gateway-parallel' | 'task';
   label: string;
   x: number;
   y: number;
   width: number;
   height: number;
   subType?: '|||' | '≡' | '';
+  cooperationMode?: 'or' | 'vote' | 'and';
+  rejectToNodeId?: string;
+  useCustomForm?: 'no' | 'yes';
+  formPath?: string;
+  ccTargets?: string[];
+  customParams?: string;
+  assigneeList?: Array<{ key: string; permission: string }>;
 }
 
 interface BPMNEdge {
@@ -50,6 +72,16 @@ interface BPMNEdge {
   to: string;
   label?: string;
   routeType: 'straight-h' | 'straight-v' | 'right-down' | 'right-down-left' | 'custom' | 'horizontal-straight';
+  condType?: string;
+  condName?: string;
+  condOp?: string;
+  condVal?: string;
+  condUserIdentities?: string[];
+  condDataVolumeMin?: string;
+  condDataVolumeMax?: string;
+  condDataTables?: string[];
+  condSelectMode?: 'userIdentity' | 'dataVolume' | 'dataTable' | 'spel';
+  condSpel?: string;
 }
 
 interface WorkflowDesignerProps {
@@ -61,27 +93,44 @@ interface WorkflowDesignerProps {
 // --- Hardcoded Preset Diagrams for absolute screenshot look ---
 const DEFAULT_NODES: BPMNNode[] = [
   { id: 'start', type: 'start', label: '开始', x: 270, y: 150, width: 36, height: 36 },
-  { id: 'gate1', type: 'gateway-or', label: '判断申请人', x: 380, y: 150, width: 46, height: 46 },
-  { id: 'task1', type: 'task', label: '课题PI审批', x: 380, y: 290, width: 110, height: 75, subType: '|||' },
-  { id: 'gate2', type: 'gateway-and', label: '判断报告', x: 570, y: 290, width: 46, height: 46 },
-  { id: 'task2', type: 'task', label: '药剂科审批', x: 570, y: 440, width: 110, height: 75, subType: '≡' },
-  { id: 'task3', type: 'task', label: '遗传办公室审批', x: 740, y: 290, width: 110, height: 75, subType: '' },
-  { id: 'task4', type: 'task', label: '科教科审批', x: 570, y: 590, width: 110, height: 75, subType: '≡' },
-  { id: 'task5', type: 'task', label: '信息科审批', x: 570, y: 740, width: 110, height: 75, subType: '≡' },
-  { id: 'end', type: 'end', label: '结束', x: 740, y: 740, width: 36, height: 36 },
+  { id: 'task1', type: 'task', label: '申请人', x: 380, y: 130, width: 110, height: 75, subType: '' },
+  { id: 'gate1', type: 'gateway-inclusive', label: '', x: 550, y: 145, width: 46, height: 46 },
+  { id: 'task2', type: 'task', label: '收藏负责人审批', x: 700, y: 130, width: 110, height: 75, subType: '', cooperationMode: 'or', rejectToNodeId: 'task1', useCustomForm: 'no', formPath: '', ccTargets: ['队列负责人'], customParams: '' },
+  { id: 'task3', type: 'task', label: '遗传办公室审批', x: 440, y: 350, width: 110, height: 75, subType: '' },
+  { id: 'task4', type: 'task', label: '药剂科审批', x: 600, y: 350, width: 110, height: 75, subType: '' },
+  { id: 'gate2', type: 'gateway-exclusive', label: '', x: 550, y: 550, width: 46, height: 46 },
+  { id: 'task5', type: 'task', label: '院长审批', x: 520, y: 720, width: 110, height: 75, subType: '' },
+  { id: 'end', type: 'end', label: '结束', x: 800, y: 740, width: 36, height: 36 },
 ];
 
 const DEFAULT_EDGES: BPMNEdge[] = [
-  { id: 'e1', from: 'start', to: 'gate1', label: '', routeType: 'straight-h' },
-  { id: 'e2', from: 'gate1', to: 'task1', label: '否', routeType: 'straight-v' },
-  { id: 'e3', from: 'gate1', to: 'gate2', label: '是', routeType: 'right-down' },
-  { id: 'e4', from: 'task1', to: 'gate2', label: '', routeType: 'straight-h' },
-  { id: 'e5', from: 'gate2', to: 'task2', label: '', routeType: 'straight-v' },
-  { id: 'e6', from: 'gate2', to: 'task3', label: '', routeType: 'straight-h' },
-  { id: 'e7', from: 'task2', to: 'task4', label: '', routeType: 'straight-v' },
-  { id: 'e8', from: 'task3', to: 'task4', label: '', routeType: 'right-down-left' },
-  { id: 'e9', from: 'task4', to: 'task5', label: '', routeType: 'straight-v' },
-  { id: 'e10', from: 'task5', to: 'end', label: '', routeType: 'straight-h' },
+  { id: 'e1', from: 'start', to: 'task1', label: '', routeType: 'straight-h' },
+  { id: 'e2', from: 'task1', to: 'gate1', label: '', routeType: 'straight-h' },
+  { id: 'e3', from: 'gate1', to: 'task2', label: '', routeType: 'straight-h', condType: '审批通过', condName: '条件名', condOp: '等于', condVal: '库管理员', condUserIdentities: ['库管理员'], condSelectMode: 'userIdentity' },
+  { id: 'e4', from: 'gate1', to: 'task3', label: '', routeType: 'custom', condType: '条件分支', condName: '数据类型', condOp: '等于', condVal: '测序', condDataTables: ['测序样本表'], condSelectMode: 'dataTable' }, 
+  { id: 'e5', from: 'gate1', to: 'task4', label: '', routeType: 'custom', condType: '条件分支', condName: '数据类型', condOp: '等于', condVal: '药品', condDataTables: ['药品成分表'], condSelectMode: 'dataTable' },
+  { id: 'e6', from: 'task2', to: 'gate2', label: '', routeType: 'right-down-left' },
+  { id: 'e7', from: 'task3', to: 'gate2', label: '', routeType: 'custom' },
+  { id: 'e8', from: 'task4', to: 'gate2', label: '', routeType: 'custom' },
+  { id: 'e9', from: 'gate2', to: 'task5', label: '', routeType: 'straight-v', condType: '条件分支', condName: '病历数', condOp: '大于', condVal: '1000', condDataVolumeMin: '1000', condDataTables: ['病历信息表'], condSelectMode: 'dataVolume' },
+  { id: 'e10', from: 'gate2', to: 'end', label: '', routeType: 'custom', condType: '条件分支', condName: '病历数', condOp: '小于等于', condVal: '1000', condDataVolumeMax: '1000', condDataTables: ['病历信息表'], condSelectMode: 'dataVolume' },
+  { id: 'e11', from: 'task5', to: 'end', label: '', routeType: 'straight-h' },
+];
+
+const PERSONNEL_PRESETS = [
+  { name: '丘绍远', code: 'qsy', key: '1877280922536161281', group: '默认分组', created: '2026-06-30 14:58:20' },
+  { name: '黄启城', code: 'hqc', key: '1877281259489767426', group: '默认分组', created: '2026-06-30 14:58:20' },
+  { name: '高唯唯', code: 'gww', key: '1889607242941329409', group: '默认分组', created: '2026-06-30 14:58:20' },
+  { name: '许晋辉', code: 'xjh', key: '1889863272778559489', group: '默认分组', created: '2026-06-30 14:58:20' },
+  { name: '洪驹发', code: 'hjf', key: '1892419531415351298', group: '默认分组', created: '2026-06-30 14:58:20' },
+  { name: '李白', code: 'libai', key: '1899006491302948865', group: '默认分组', created: '2026-06-30 14:58:20' },
+  { name: '李白', code: 'libai', key: '1899006491302948865', group: '默认分组', created: '2026-06-30 14:58:20' },
+  { name: '丘绍远', code: 'qsy', key: '1877280922536161281', group: '默认分组', created: '2026-06-30 14:58:20' },
+  { name: 'gaojiayong', code: 'gjy', key: '1914581733248712706', group: '默认分组', created: '2026-06-30 14:58:20' },
+];
+
+const SPEL_PRESETS = [
+  { name: '导出审批-课题负责人-动态...', code: '无', key: '@topicWorkflowHelper.getLeaderUserId(#topicId)', group: '默认分组', created: '2026-06-16 14:01:20' },
 ];
 
 export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesignerProps) {
@@ -89,6 +138,12 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
   const [flowId, setFlowId] = useState(workflow.id || 'p_' + Date.now().toString().slice(3));
   const [flowName, setFlowName] = useState(workflow.name || '新建流程_复制');
   const [category, setCategory] = useState(workflow.category || '数据导出');
+  
+  // New States for Tab Layout
+  const [activeTab, setActiveTab] = useState<'basic' | 'design'>('basic');
+  const [designerModel, setDesignerModel] = useState<'classic' | 'dingtalk'>('classic');
+  const [customForm, setCustomForm] = useState<'no' | 'yes'>('yes');
+  const [formIdentifier, setFormIdentifier] = useState('');
   
   // Custom multi-select states matching the new research library adaptation & subConfigs
   const [selectedLibraries, setSelectedLibraries] = useState<string[]>(() => {
@@ -116,6 +171,7 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
   const [nodes, setNodes] = useState<BPMNNode[]>(DEFAULT_NODES);
   const [edges, setEdges] = useState<BPMNEdge[]>(DEFAULT_EDGES);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [toolMode, setToolMode] = useState<'pointer' | 'hand' | 'connect' | 'add'>('pointer');
   
   // Canvas zoom and offset states (with limits)
@@ -149,14 +205,113 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
   const [userIdentities, setUserIdentities] = useState<string[]>([]);
 
   
+  // New assignee configuration states
+  const [isAddingAssignee, setIsAddingAssignee] = useState(false);
+  const [newAssigneeKey, setNewAssigneeKey] = useState('');
+  const [newAssigneePerm, setNewAssigneePerm] = useState('');
+  const [isSelectingPreset, setIsSelectingPreset] = useState(false);
+
+  // States for personnel selection dialog ("人员选择" 弹窗)
+  const [personnelActiveTab, setPersonnelActiveTab] = useState<'user' | 'spel'>('user');
+  const [searchPermissionCode, setSearchPermissionCode] = useState('');
+  const [searchPermissionName, setSearchPermissionName] = useState('');
+  const [searchStartDate, setSearchStartDate] = useState('');
+  const [searchEndDate, setSearchEndDate] = useState('');
+  const [deptSearch, setDeptSearch] = useState('');
+  const [selectedPresetIndices, setSelectedPresetIndices] = useState<number[]>([]);
+
+  // --- Personnel Selection Dialog Handlers ---
+  const filteredPresets = PERSONNEL_PRESETS.filter(preset => {
+    if (searchPermissionCode.trim() && !preset.code.toLowerCase().includes(searchPermissionCode.trim().toLowerCase())) {
+      return false;
+    }
+    if (searchPermissionName.trim() && !preset.name.toLowerCase().includes(searchPermissionName.trim().toLowerCase())) {
+      return false;
+    }
+    return true;
+  });
+
+  const filteredSpelPresets = SPEL_PRESETS.filter(preset => {
+    if (searchPermissionCode.trim() && !preset.code.toLowerCase().includes(searchPermissionCode.trim().toLowerCase())) {
+      return false;
+    }
+    if (searchPermissionName.trim() && !preset.name.toLowerCase().includes(searchPermissionName.trim().toLowerCase())) {
+      return false;
+    }
+    return true;
+  });
+
+  const handleTogglePresetRow = (idx: number) => {
+    setSelectedPresetIndices(prev => 
+      prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx]
+    );
+  };
+
+  const handleSelectAllPreset = () => {
+    const listToUse = personnelActiveTab === 'user' ? filteredPresets : filteredSpelPresets;
+    const masterList = personnelActiveTab === 'user' ? PERSONNEL_PRESETS : SPEL_PRESETS;
+    const visibleIndices = listToUse.map(preset => masterList.indexOf(preset));
+    const allVisibleSelected = visibleIndices.every(idx => selectedPresetIndices.includes(idx));
+    
+    if (allVisibleSelected) {
+      setSelectedPresetIndices(prev => prev.filter(idx => !visibleIndices.includes(idx)));
+    } else {
+      setSelectedPresetIndices(prev => Array.from(new Set([...prev, ...visibleIndices])));
+    }
+  };
+
+  const handlePresetReset = () => {
+    setSearchPermissionCode('');
+    setSearchPermissionName('');
+    setSearchStartDate('');
+    setSearchEndDate('');
+    setSelectedPresetIndices([]);
+  };
+
+  const handlePresetConfirm = () => {
+    if (!selectedNodeId) {
+      showToast('未选择活动节点');
+      return;
+    }
+    if (selectedPresetIndices.length === 0) {
+      showToast('请至少选择一个办理人');
+      return;
+    }
+    
+    const masterList = personnelActiveTab === 'user' ? PERSONNEL_PRESETS : SPEL_PRESETS;
+    const selectedPresets = selectedPresetIndices.map(idx => masterList[idx]);
+    const node = nodes.find(n => n.id === selectedNodeId);
+    if (!node) return;
+    
+    const currentList = node.assigneeList || [];
+    const nextList = [...currentList];
+    
+    selectedPresets.forEach(preset => {
+      // Avoid duplicates based on key (入库主键)
+      if (!nextList.some(item => item.key === preset.key)) {
+        nextList.push({
+          key: preset.key,
+          permission: preset.name
+        });
+      }
+    });
+    
+    setNodes(prev => prev.map(n => n.id === selectedNodeId ? { ...n, assigneeList: nextList } : n));
+    setIsSelectingPreset(false);
+    setSelectedPresetIndices([]);
+    showToast(`成功添加 ${selectedPresets.length} 个办理人`);
+  };
+
   // New state to control inspector visibility
   const [isInspectorVisible, setIsInspectorVisible] = useState(false);
+  const [nodeActiveTab, setNodeActiveTab] = useState<'basic' | 'assignee' | 'listener' | 'permission'>('basic');
 
   // New state variables for condition configuration
   const [dataTables, setDataTables] = useState<string[]>([]);
   const [volumeThreshold, setVolumeThreshold] = useState<number>(0);
   const [applicantIdentities, setApplicantIdentities] = useState<string[]>([]);
   const [expression, setExpression] = useState('');
+  const [tableSearch, setTableSearch] = useState('');
 
   // Toast message notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -284,13 +439,16 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
   };
 
   // Add standard nodes from Toolbox click
-  const handleAddNodeToCanvas = (type: 'start' | 'end' | 'gateway-or' | 'gateway-and' | 'task') => {
+  const handleAddNodeToCanvas = (type: 'start' | 'end' | 'gateway-or' | 'gateway-and' | 'gateway-inclusive' | 'gateway-exclusive' | 'gateway-parallel' | 'task') => {
     const nextOffset = nodes.length * 20;
     const labels = {
       'start': '新开始节点',
       'end': '新结束节点',
       'gateway-or': '审批决策判定',
       'gateway-and': '并行同步验证',
+      'gateway-inclusive': '包含网关',
+      'gateway-exclusive': '互斥网关',
+      'gateway-parallel': '并行网关',
       'task': '新增办理审批任务'
     };
     const dimensions = {
@@ -298,6 +456,9 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
       'end': { w: 36, h: 36 },
       'gateway-or': { w: 46, h: 46 },
       'gateway-and': { w: 46, h: 46 },
+      'gateway-inclusive': { w: 46, h: 46 },
+      'gateway-exclusive': { w: 46, h: 46 },
+      'gateway-parallel': { w: 46, h: 46 },
       'task': { w: 110, h: 75 }
     };
     
@@ -390,6 +551,14 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
     setPanning(false);
   };
 
+  const handleWheel = (e: React.WheelEvent) => {
+    if (e.deltaY < 0) {
+      setZoom(z => Math.min(1.5, z + 0.05));
+    } else {
+      setZoom(z => Math.max(0.6, z - 0.05));
+    }
+  };
+
   // Delete node and its connections
   const handleDeleteNode = (nodeId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -420,32 +589,36 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
     const toTop = to.y - to.height / 2;
 
     if (edge.routeType === 'straight-h') {
-      // Direct right layout
-      return `M ${fromRight} ${from.y} L ${toLeft} ${to.y}`;
+      // Go horizontally to the midpoint, then vertically, then horizontally to the target (strictly orthogonal, no slant)
+      const midX = (fromRight + toLeft) / 2;
+      return `M ${fromRight} ${from.y} L ${midX} ${from.y} L ${midX} ${to.y} L ${toLeft} ${to.y}`;
     }
 
     if (edge.routeType === 'straight-v') {
-      // Direct down layout
-      return `M ${from.x} ${fromBottom} L ${to.x} ${toTop}`;
+      // Go vertically to the midpoint, then horizontally, then vertically to the target (strictly orthogonal, no slant)
+      const midY = (fromBottom + toTop) / 2;
+      return `M ${from.x} ${fromBottom} L ${from.x} ${midY} L ${to.x} ${midY} L ${to.x} ${toTop}`;
     }
 
     if (edge.routeType === 'right-down') {
-      // Gateway 1 '是' direction
+      // Go right then down into top
       return `M ${fromRight} ${from.y} L ${to.x} ${from.y} L ${to.x} ${toTop}`;
     }
 
     if (edge.routeType === 'right-down-left') {
-      // Task 3 '遗传办公室审批' right connect down and left to Task 4 '科教科审批'
-      const startX = fromRight;
-      const startY = from.y;
-      const bendX = fromRight + 30; // goes right by 30px
-      const endX = toRight;
-      const endY = to.y;
-      return `M ${startX} ${startY} L ${bendX} ${startY} L ${bendX} ${endY} L ${endX} ${endY}`;
+      // Go right out, down, then left into right side
+      const bendX = Math.max(fromRight + 30, toRight + 30);
+      return `M ${fromRight} ${from.y} L ${bendX} ${from.y} L ${bendX} ${to.y} L ${toRight} ${to.y}`;
     }
 
-    // Default Fallback adaptive orthgonal router
-    if (Math.abs(from.y - to.y) < 15) {
+    if (edge.routeType === 'custom') {
+      // For gate1 -> task3, gate1 -> task4, task3 -> gate2, task4 -> gate2
+      // Typical top-down split or merge (from bottom of node to top of target)
+      return `M ${from.x} ${fromBottom} L ${from.x} ${(fromBottom + toTop)/2} L ${to.x} ${(fromBottom + toTop)/2} L ${to.x} ${toTop}`;
+    }
+
+    // Default Fallback adaptive orthogonal router
+    if (Math.abs(from.y - to.y) < 1) {
       return `M ${fromRight} ${from.y} L ${toLeft} ${to.y}`;
     } else {
       return `M ${fromRight} ${from.y} L ${(fromRight + toLeft) / 2} ${from.y} L ${(fromRight + toLeft) / 2} ${to.y} L ${toLeft} ${to.y}`;
@@ -455,7 +628,7 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
   const activeNode = nodes.find(n => n.id === selectedNodeId);
 
   return (
-    <div className="flex-1 flex bg-[#f8fbff] text-slate-800 font-sans h-full overflow-hidden absolute inset-0 z-20">
+    <div className="flex-1 flex flex-col bg-[#f8fbff] text-slate-800 font-sans h-full overflow-hidden absolute inset-0 z-20">
       
       {/* Toast Notice alerts */}
       <AnimatePresence>
@@ -472,21 +645,250 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
         )}
       </AnimatePresence>
 
-      {/* --- Part 1: LEFT SIDEBAR Basic Info --- */}
-      <div id="left_sidebar_info" className="w-[280px] bg-white border-r border-[#e2e8f5] flex flex-col h-full shrink-0 shadow-sm z-30 select-none">
-        
-        {/* Title row */}
-        <div className="p-4 py-3.5 border-b border-[#f1f5fd] flex items-center gap-2">
-          <ChevronLeft 
-            onClick={onClose} 
-            className="w-5 h-5 text-slate-400 hover:text-slate-700 cursor-pointer transition-colors" 
-            title="返回流程列表"
-          />
-          <div className="flex items-center gap-1.5 ml-1">
-            <span className="w-1 h-4 bg-blue-600 rounded-sm" />
-            <h2 className="font-bold text-[14px] text-slate-800 tracking-wide">基本信息</h2>
+      {/* Top Navigation Tabs */}
+      <div className="h-[64px] bg-white border-b border-slate-200 flex items-center justify-center relative shrink-0">
+        <div className="absolute left-6 top-1/2 -translate-y-1/2">
+          <div 
+            onClick={onClose}
+            className="w-[36px] h-[28px] border border-slate-200 rounded-[4px] flex items-center justify-center cursor-pointer shadow-sm hover:bg-slate-50 transition-colors"
+          >
+            <Tag className="w-4 h-4 text-red-500 fill-red-50" />
           </div>
         </div>
+        
+        <div className="flex bg-slate-50/80 rounded-[6px] p-1 gap-1 border border-slate-100 shadow-sm">
+          <button 
+            onClick={() => setActiveTab('basic')}
+            className={`flex items-center gap-2 px-8 py-2.5 rounded-[4px] text-[14px] font-medium transition-all duration-200 ${
+              activeTab === 'basic' 
+                ? 'bg-[#2b5df2] text-white shadow-sm' 
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Pencil className={`w-[15px] h-[15px] ${activeTab === 'basic' ? 'text-red-300 fill-white/20' : 'text-slate-400'}`} /> 
+            基础信息
+          </button>
+          <button 
+            onClick={() => setActiveTab('design')}
+            className={`flex items-center gap-2 px-8 py-2.5 rounded-[4px] text-[14px] font-medium transition-all duration-200 ${
+              activeTab === 'design' 
+                ? 'bg-white text-slate-700 shadow-sm border border-slate-200/50' 
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Network className={`w-[15px] h-[15px] ${activeTab === 'design' ? 'text-orange-400 fill-orange-50' : 'text-slate-400'}`} /> 
+            流程设计
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-auto bg-[#f6f8fb] relative flex">
+        {activeTab === 'basic' ? (
+          <div className="w-full h-full flex justify-center p-8 overflow-y-auto custom-scrollbar">
+            
+            {/* The Form from Image 1 */}
+            <div className="w-[900px] h-fit bg-white rounded-xl shadow-[0_2px_12px_rgba(0,0,0,0.02)] border border-slate-200/80 p-8 pt-6 relative">
+              {/* Left blue border marker */}
+              <div className="absolute left-[-1px] top-8 bottom-8 w-[4px] bg-[#3b82f6] rounded-r-md"></div>
+              
+              <h2 className="text-[16px] font-bold text-slate-800 mb-8 flex items-center gap-2">
+                <div className="w-1 h-[14px] bg-blue-600 rounded-sm"></div>
+                基本配置
+              </h2>
+
+              <div className="space-y-6">
+                
+                {/* 流程编码 */}
+                <div className="flex text-[14px]">
+                  <div className="w-[120px] pt-2 text-slate-700 font-semibold flex-shrink-0">
+                    <span className="text-red-500 mr-1">*</span>流程编码
+                  </div>
+                  <div className="flex-1 relative">
+                    <input 
+                      type="text" 
+                      placeholder="请输入流程编码" 
+                      value={flowId}
+                      onChange={(e) => setFlowId(e.target.value)}
+                      className="w-full h-10 px-3 border border-slate-200 rounded text-slate-800 outline-none focus:border-blue-500 transition-colors"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">{flowId.length} / 40</span>
+                  </div>
+                </div>
+
+                {/* 流程名称 */}
+                <div className="flex text-[14px]">
+                  <div className="w-[120px] pt-2 text-slate-700 font-semibold flex-shrink-0">
+                    <span className="text-red-500 mr-1">*</span>流程名称
+                  </div>
+                  <div className="flex-1 relative">
+                    <input 
+                      type="text" 
+                      placeholder="请输入流程名称" 
+                      value={flowName}
+                      onChange={(e) => setFlowName(e.target.value)}
+                      className="w-full h-10 px-3 border border-slate-200 rounded text-slate-800 outline-none focus:border-blue-500 transition-colors"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">{flowName.length} / 100</span>
+                  </div>
+                </div>
+
+                {/* 设计器模型 */}
+                <div className="flex text-[14px]">
+                  <div className="w-[120px] pt-2 text-slate-700 font-semibold flex-shrink-0">
+                    <span className="text-red-500 mr-1">*</span>设计器模型
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex gap-4">
+                      <div 
+                        onClick={() => setDesignerModel('classic')}
+                        className={`flex-1 border rounded-md p-4 cursor-pointer relative transition-all overflow-hidden ${
+                          designerModel === 'classic' 
+                            ? 'border-blue-400 bg-blue-50/40' 
+                            : 'border-slate-200 bg-white hover:border-blue-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center shrink-0">
+                            <Computer className="w-5 h-5 text-white" />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-slate-800 mb-0.5 text-[15px]">经典模型</h4>
+                            <p className="text-slate-400 text-[12px]">自由拖拽连线，灵活编排流程</p>
+                          </div>
+                        </div>
+                        <div className={`absolute right-4 top-4 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${designerModel === 'classic' ? 'border-blue-500 bg-blue-500' : 'border-slate-300'}`}>
+                          {designerModel === 'classic' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                        </div>
+                        {designerModel === 'classic' && (
+                          <div className="absolute right-0 bottom-0 text-blue-500 pointer-events-none">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                              <path d="M24 0V24H0L24 0Z" fill="currentColor"/>
+                              <path d="M17 9L11 15L7.5 11.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+
+
+                    </div>
+                  </div>
+                </div>
+
+                {/* 流程类别 */}
+                <div className="flex text-[14px]">
+                  <div className="w-[120px] pt-2 text-slate-700 font-semibold flex-shrink-0">
+                    流程类别
+                  </div>
+                  <div className="flex-1">
+                    <div className="relative">
+                      <select 
+                        value={category}
+                        onChange={(e) => setCategory(e.target.value)}
+                        className="w-[320px] h-10 px-3 border border-slate-200 rounded text-slate-800 outline-none focus:border-blue-500 transition-colors appearance-none bg-white"
+                      >
+                        <option value="" disabled>请选择流程类别</option>
+                        <option value="数据导出">数据导出</option>
+                        <option value="权限审批">权限审批</option>
+                      </select>
+                      <ChevronDown className="w-4 h-4 text-slate-400 absolute left-[295px] top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 自定义表单 */}
+                <div className="flex text-[14px]">
+                  <div className="w-[120px] pt-2 text-slate-700 font-semibold flex-shrink-0">
+                    <span className="text-red-500 mr-1">*</span>自定义表单
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex gap-4">
+                      <div 
+                        onClick={() => setCustomForm('no')}
+                        className={`flex-1 border rounded-md p-4 cursor-pointer relative transition-all overflow-hidden ${
+                          customForm === 'no' 
+                            ? 'border-blue-400 bg-blue-50/40' 
+                            : 'border-slate-200 bg-white hover:border-blue-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-8 h-8 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0 text-blue-500">
+                            <FileText className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-slate-800 mb-0.5 text-[15px]">否</h4>
+                            <p className="text-slate-400 text-[12px]">填写页面路径</p>
+                          </div>
+                        </div>
+                        <div className={`absolute right-4 top-4 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${customForm === 'no' ? 'border-blue-500 bg-blue-500' : 'border-slate-300'}`}>
+                          {customForm === 'no' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                        </div>
+                        {customForm === 'no' && (
+                          <div className="absolute right-0 bottom-0 text-blue-500 pointer-events-none">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                              <path d="M24 0V24H0L24 0Z" fill="currentColor"/>
+                              <path d="M17 9L11 15L7.5 11.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+
+
+                    </div>
+                  </div>
+                </div>
+
+
+
+              </div>
+            </div>
+            
+          </div>
+        ) : (
+          <>
+          <div className="flex-1 w-full h-full relative overflow-hidden bg-[#fafbfc]">
+            {/* Left Tool Palette */}
+            <div className="absolute left-6 top-6 bg-white border border-slate-200 shadow-[0_2px_12px_rgba(0,0,0,0.06)] rounded-lg w-16 py-3 flex flex-col items-center gap-4 z-30">
+              <div className="flex flex-col items-center group cursor-pointer" title="开始" onClick={() => handleAddNodeToCanvas('start')}>
+                <div className="w-8 h-8 rounded-full border-[3px] border-slate-300 bg-white flex items-center justify-center">
+                   <div className="w-3 h-3 bg-green-500 rounded-full group-hover:scale-110 transition-transform"></div>
+                </div>
+                <span className="text-[10px] mt-1 text-slate-500 font-medium">开始</span>
+              </div>
+              <div className="w-8 h-px bg-slate-100"></div>
+              <div className="flex flex-col items-center group cursor-pointer" title="中间节点" onClick={() => handleAddNodeToCanvas('task')}>
+                <div className="w-8 h-8 rounded-full border-2 border-slate-400 bg-white group-hover:bg-slate-50 transition-colors flex items-center justify-center">
+                  <div className="w-2 h-2 rounded-sm border border-slate-300 bg-white group-hover:scale-110 transition-transform"></div>
+                </div>
+                <span className="text-[10px] mt-1 text-slate-500 font-medium">中间节点</span>
+              </div>
+              <div className="flex flex-col items-center group cursor-pointer" title="结束" onClick={() => handleAddNodeToCanvas('end')}>
+                <div className="w-8 h-8 rounded-full border-[3px] border-slate-600 bg-white flex items-center justify-center">
+                  <div className="w-4 h-4 rounded-full border border-slate-400 group-hover:scale-110 transition-transform"></div>
+                </div>
+                <span className="text-[10px] mt-1 text-slate-500 font-medium">结束</span>
+              </div>
+              <div className="w-8 h-px bg-slate-100"></div>
+              <div className="flex flex-col items-center group cursor-pointer" title="互斥网关" onClick={() => handleAddNodeToCanvas('gateway-exclusive')}>
+                <div className="w-8 h-8 rotate-45 border-2 border-slate-400 bg-white flex items-center justify-center group-hover:bg-slate-50 transition-colors">
+                  <span className="-rotate-45 text-slate-600 font-bold text-lg leading-none">×</span>
+                </div>
+                <span className="text-[10px] mt-1 text-slate-500 font-medium">互斥网关</span>
+              </div>
+              <div className="flex flex-col items-center group cursor-pointer" title="并行网关" onClick={() => handleAddNodeToCanvas('gateway-parallel')}>
+                <div className="w-8 h-8 rotate-45 border-2 border-slate-400 bg-white flex items-center justify-center group-hover:bg-slate-50 transition-colors">
+                  <span className="-rotate-45 text-slate-600 font-bold text-lg leading-none">+</span>
+                </div>
+                <span className="text-[10px] mt-1 text-slate-500 font-medium">并行网关</span>
+              </div>
+              <div className="flex flex-col items-center group cursor-pointer" title="包含网关" onClick={() => handleAddNodeToCanvas('gateway-inclusive')}>
+                <div className="w-8 h-8 rotate-45 border-2 border-slate-400 bg-white flex items-center justify-center group-hover:bg-slate-50 transition-colors">
+                  <div className="-rotate-45 w-4 h-4 rounded-full border-2 border-slate-400"></div>
+                </div>
+                <span className="text-[10px] mt-1 text-slate-500 font-medium">包含网关</span>
+              </div>
+            </div>
+
+            <div className="hidden">
 
         {/* Info Forms */}
         <div className="flex-1 p-4 space-y-4.5 overflow-y-auto custom-scrollbar text-xs">
@@ -583,153 +985,49 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
 
         </div>
       </div>
+      </div>
 
       {/* --- Part 2: CENTER BPMN DESIGNER CANVAS --- */}
-      <div className="flex-1 flex flex-col p-4 relative z-20 min-w-0">
-        
-        {/* Canvas frame and toolbar structure */}
-        <div className="flex-1 bg-white rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.04)] border border-[#e2e8f5] flex flex-col overflow-hidden relative">
+      <div className="absolute inset-0 z-10 overflow-hidden bg-slate-50"
+        onWheel={handleWheel}
+        onMouseDown={handleCanvasMouseDown}
+        onMouseMove={handleCanvasMouseMove}
+        onMouseUp={handleCanvasMouseUp}
+        onMouseLeave={handleCanvasMouseUp}
+        onClick={() => { setSelectedNodeId(null); setSelectedEdgeId(null); }}
+      >
+        <div className="w-full h-full relative">
           
-          {/* Top BPMN toolbar matching her style */}
-          <div className="h-12 border-b border-[#e2e8f5] px-4 bg-[#fafcfe] flex items-center justify-between shrink-0 select-none z-10">
-            <div className="flex items-center gap-3">
-              
-              {/* File selectors */}
-              <button 
-                onClick={handleOpenFile}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50/50 rounded font-medium text-xs transition-colors cursor-pointer"
-                title="导入预置 BPMN 流程"
-              >
-                <FolderOpen className="w-4 h-4 text-slate-500" />
-                <span>打开文件</span>
-              </button>
-
-              <button 
-                onClick={handleDownloadFile}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50/50 rounded font-medium text-xs transition-colors cursor-pointer"
-                title="导出并下载流程 json"
-              >
-                <Download className="w-4 h-4 text-slate-500" />
-                <span>导出配置</span>
-              </button>
-
-              <button 
-                onClick={() => showToast('流程图格式校对：验证通过 (流程设计有效)')}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50/50 rounded font-medium text-xs transition-all cursor-pointer"
-                title="校验与浏览当前流程"
-              >
-                <Eye className="w-4 h-4 text-slate-500" />
-                <span>浏览</span>
-              </button>
-
-              <span className="w-px h-5 bg-slate-200 mx-1" />
-
-              {/* Alignments (Standard vector grid alignment icons) */}
-              <div className="flex items-center gap-1">
-                {[
-                  { title: '左对齐', path: 'M4 4h16M4 8h10M4 12h16M4 16h10M4 20h16' },
-                  { title: '居中对齐', path: 'M4 4h16M6 8h12M4 12h16M6 16h12M4 20h16' },
-                  { title: '右对齐', path: 'M4 4h16M10 8h10M4 12h16M10 16h10M4 20h16' },
-                  { title: '等距分布', path: 'M4 4v16M20 4v16M8 8h8M8 14h8' }
-                ].map((item, id) => (
-                  <button 
-                    key={id}
-                    onClick={() => showToast(`自动重新编排：${item.title}`)}
-                    className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded transition-colors"
-                    title={item.title}
-                  >
-                    <svg className="w-3.5 h-3.5 fill-none stroke-current" strokeWidth="2" strokeLinecap="round" viewBox="0 0 24 24">
-                      <path d={item.path} />
-                    </svg>
-                  </button>
-                ))}
-              </div>
-
-              <span className="w-px h-5 bg-slate-200 mx-1" />
-
-              {/* Zoom multipliers */}
-              <div className="flex items-center gap-1">
-                <button 
-                  onClick={() => setZoom(z => Math.max(0.6, z - 0.1))} 
-                  className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded transition-colors text-xs font-bold"
-                  title="缩小"
-                >
-                  －
-                </button>
-                <select 
-                  className="bg-transparent text-[11px] font-semibold text-slate-600 outline-none border-none py-1 px-1.5 hover:bg-slate-100 rounded"
-                  value={`${Math.round(zoom * 100)}%`}
-                  onChange={(e) => setZoom(parseFloat(e.target.value) / 100)}
-                >
-                  <option value="60%">60%</option>
-                  <option value="80%">80%</option>
-                  <option value="100%">100%</option>
-                  <option value="120%">120%</option>
-                  <option value="140%">140%</option>
-                </select>
-                <button 
-                  onClick={() => setZoom(z => Math.min(1.5, z + 0.1))} 
-                  className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded transition-colors text-xs font-bold"
-                  title="放大"
-                >
-                  ＋
-                </button>
-                <button 
-                  onClick={() => { setZoom(1); setPanOffset({ x: -100, y: -40 }); }}
-                  className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded transition-colors"
-                  title="居中适应画布"
-                >
-                  <Maximize2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              <span className="w-px h-5 bg-slate-200 mx-1" />
-
-              {/* Undo/Redo/Refresh */}
-              <div className="flex items-center gap-0.5">
-                <button 
-                  onClick={handleUndo} 
-                  className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded transition-colors"
-                  title="撤销"
-                >
-                  <span className="text-xs font-bold font-mono">↩</span>
-                </button>
-                <button 
-                  onClick={handleRedo} 
-                  className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded transition-colors"
-                  title="重做"
-                >
-                  <span className="text-xs font-bold font-mono">↪</span>
-                </button>
-                <button 
-                  onClick={handleResetCanvas} 
-                  className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded transition-colors ml-0.5"
-                  title="刷新/重置到默认"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-            </div>
-
-            {/* Visual Header Save triggers */}
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={handleSaveAll}
-                className="px-4.5 py-1 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded text-xs transition-colors shadow-sm cursor-pointer h-7 text-center block"
-              >
-                保存
-              </button>
-            </div>
+          {/* Top Right Tool Bar */}
+          <div className="absolute right-6 top-6 bg-white border border-slate-200 shadow-[0_2px_12px_rgba(0,0,0,0.06)] rounded flex items-center z-30">
+            <button onClick={() => { setZoom(1); setPanOffset({ x: -100, y: -40 }); }} className="w-8 h-8 flex items-center justify-center border-r border-slate-100 hover:bg-slate-50 transition-colors" title="适应屏幕">
+              <Maximize2 className="w-3.5 h-3.5 text-slate-600" />
+            </button>
+            <button onClick={() => setZoom(z => Math.min(1.5, z + 0.1))} className="w-8 h-8 flex items-center justify-center border-r border-slate-100 hover:bg-slate-50 transition-colors" title="放大">
+              <span className="text-slate-600 font-bold leading-none">+</span>
+            </button>
+            <button onClick={() => setZoom(z => Math.max(0.6, z - 0.1))} className="w-8 h-8 flex items-center justify-center border-r border-slate-100 hover:bg-slate-50 transition-colors" title="缩小">
+              <span className="text-slate-600 font-bold leading-none">-</span>
+            </button>
+            <button onClick={handleUndo} className="w-8 h-8 flex items-center justify-center border-r border-slate-100 hover:bg-slate-50 transition-colors" title="撤销">
+              <span className="text-slate-600 font-bold">«</span>
+            </button>
+            <button onClick={handleRedo} className="w-8 h-8 flex items-center justify-center border-r border-slate-100 hover:bg-slate-50 transition-colors" title="重做">
+              <span className="text-slate-600 font-bold">»</span>
+            </button>
+            <button onClick={() => { if(selectedNodeId) handleDeleteNode(selectedNodeId, {stopPropagation:()=>{}} as any) }} className="w-8 h-8 flex items-center justify-center border-r border-slate-100 hover:bg-slate-50 text-red-500 transition-colors" title="删除">
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+            <button onClick={() => showToast('已保存为图片')} className="w-8 h-8 flex items-center justify-center border-r border-slate-100 hover:bg-slate-50 transition-colors" title="保存图片">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-600"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+            </button>
+            <button onClick={handleDownloadFile} className="w-8 h-8 flex items-center justify-center hover:bg-slate-50 transition-colors" title="下载">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-600"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            </button>
           </div>
 
           {/* Interactive designer Canvas Paper */}
-          <div 
-            className={`flex-1 overflow-hidden relative cursor-crosshair`}
-            onMouseDown={handleCanvasMouseDown}
-            onMouseMove={handleCanvasMouseMove}
-            onMouseUp={handleCanvasMouseUp}
-          >
+          <div className="flex-1 w-full h-full overflow-hidden relative cursor-crosshair">
             
             {/* Real SVG Grid canvas backdrop */}
             <svg 
@@ -766,50 +1064,112 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
                 {edges.map((edge) => {
                   const pathStr = getRoutePathStr(edge);
                   if (!pathStr) return null;
+                  const isEdgeSelected = selectedEdgeId === edge.id;
 
                   return (
-                    <g key={edge.id} className="group cursor-pointer" onClick={() => { setIsInspectorVisible(true); setSelectedNodeId(null); }}>
+                    <g 
+                      key={edge.id} 
+                      className="group cursor-pointer" 
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        setSelectedEdgeId(edge.id); 
+                        setSelectedNodeId(null); 
+                      }}
+                    >
                       {/* Thicker hover path trigger target */}
                       <path 
                         d={pathStr} 
                         fill="none" 
                         stroke="transparent" 
-                        strokeWidth="10" 
-                        className="hover:stroke-blue-50"
+                        strokeWidth="12" 
+                        className="hover:stroke-blue-50/50"
                       />
                       {/* Active visible line */}
                       <path 
                         d={pathStr} 
                         fill="none" 
-                        stroke="rgba(80,80,80,0.95)" 
-                        strokeWidth="1.75" 
+                        stroke={isEdgeSelected ? "#3b82f6" : "rgba(80,80,80,0.95)"} 
+                        strokeWidth={isEdgeSelected ? "2.5" : "1.75"} 
                         markerEnd="url(#arrow)"
-                        className="transition-all stroke-slate-700"
+                        className="transition-all"
                       />
                       
-                      {/* Action Path label "是" or "否" */}
-                      {edge.label && (
-                        <g>
-                          <rect 
-                            x={edge.from === 'gate1' && edge.to === 'task1' ? 390 : 476}
-                            y={edge.from === 'gate1' && edge.to === 'task1' ? 208 : 138}
-                            width="20"
-                            height="15"
-                            fill="white"
-                            rx="2"
-                          />
-                          <text 
-                            x={edge.from === 'gate1' && edge.to === 'task1' ? 400 : 486}
-                            y={edge.from === 'gate1' && edge.to === 'task1' ? 220 : 150}
-                            fill="#718096"
-                            fontSize="10"
-                            fontWeight="semibold"
-                            textAnchor="middle"
-                          >
-                            {edge.label}
-                          </text>
-                        </g>
-                      )}
+                      {/* Action Path label "是" or "否" or other conditions */}
+                      {(() => {
+                        const fromNode = nodes.find(n => n.id === edge.from);
+                        const toNode = nodes.find(n => n.id === edge.to);
+                        if (!fromNode || !toNode) return null;
+                        
+                        // Dynamically compile summary label if none is custom-typed
+                        let displayLabel = edge.label;
+                        if (!displayLabel) {
+                          const mode = edge.condSelectMode || (edge.condUserIdentities && edge.condUserIdentities.length > 0 ? 'userIdentity' : (edge.condDataVolumeMin || edge.condDataVolumeMax ? 'dataVolume' : (edge.condDataTables && edge.condDataTables.length > 0 ? 'dataTable' : (edge.condSpel ? 'spel' : 'userIdentity'))));
+                          
+                          if (mode === 'userIdentity' && edge.condUserIdentities && edge.condUserIdentities.length > 0) {
+                            displayLabel = edge.condUserIdentities.join('/');
+                          } else if (mode === 'dataVolume' && (edge.condDataVolumeMin || edge.condDataVolumeMax)) {
+                            const min = edge.condDataVolumeMin || '0';
+                            const max = edge.condDataVolumeMax || '无上限';
+                            displayLabel = `${min}-${max}条`;
+                          } else if (mode === 'dataTable' && edge.condDataTables && edge.condDataTables.length > 0) {
+                            displayLabel = `${edge.condDataTables.length}张表`;
+                          } else if (mode === 'spel' && edge.condSpel) {
+                            displayLabel = edge.condSpel;
+                          }
+                        }
+                        
+                        if (!displayLabel) return null;
+
+                        let mx = (fromNode.x + toNode.x) / 2;
+                        let my = (fromNode.y + toNode.y) / 2;
+                        
+                        if (edge.routeType === 'straight-h') {
+                          mx = (fromNode.x + fromNode.width / 2 + toNode.x - toNode.width / 2) / 2;
+                          my = fromNode.y;
+                        } else if (edge.routeType === 'straight-v') {
+                          mx = fromNode.x;
+                          my = (fromNode.y + fromNode.height / 2 + toNode.y - toNode.height / 2) / 2;
+                        } else if (edge.routeType === 'right-down') {
+                          mx = toNode.x;
+                          my = fromNode.y;
+                        } else if (edge.routeType === 'right-down-left') {
+                          const bendX = Math.max(fromNode.x + fromNode.width / 2 + 30, toNode.x + toNode.width / 2 + 30);
+                          mx = bendX;
+                          my = (fromNode.y + toNode.y) / 2;
+                        } else if (edge.routeType === 'custom') {
+                          mx = (fromNode.x + toNode.x) / 2;
+                          my = (fromNode.y + fromNode.height / 2 + toNode.y - toNode.height / 2) / 2;
+                        }
+                        
+                        const labelWidth = displayLabel.length * 7 + 16;
+                        
+                        return (
+                          <g>
+                            <rect 
+                              x={mx - labelWidth / 2}
+                              y={my - 10}
+                              width={labelWidth}
+                              height="20"
+                              fill="white"
+                              stroke={isEdgeSelected ? "#3b82f6" : "#e2e8f0"}
+                              strokeWidth="1"
+                              rx="4"
+                              className="shadow-sm"
+                            />
+                            <text 
+                              x={mx}
+                              y={my + 4}
+                              fill={isEdgeSelected ? "#2563eb" : "#475569"}
+                              fontSize="11"
+                              fontWeight="500"
+                              textAnchor="middle"
+                              className="font-sans select-none"
+                            >
+                              {displayLabel}
+                            </text>
+                          </g>
+                        );
+                      })()}
                     </g>
                   );
                 })}
@@ -886,7 +1246,7 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
                       )}
 
                       {/* Rendering Gateway diamonds */}
-                      {(node.type === 'gateway-or' || node.type === 'gateway-and') && (
+                      {(node.type === 'gateway-exclusive' || node.type === 'gateway-parallel' || node.type === 'gateway-inclusive' || node.type === 'gateway-or' || node.type === 'gateway-and') && (
                         <g>
                           <polygon 
                             points={`0,${-node.height/2} ${node.width/2},0 0,${node.height/2} ${-node.width/2},0`}
@@ -895,11 +1255,14 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
                             strokeWidth="1.5"
                           />
                           {/* Inner cross indicator for gateway */}
-                          {node.type === 'gateway-or' && (
+                          {(node.type === 'gateway-exclusive' || node.type === 'gateway-or') && (
                             <text y="4.5" textAnchor="middle" fontSize="15" fontWeight="bold" fill="#333">✕</text>
                           )}
-                          {node.type === 'gateway-and' && (
+                          {(node.type === 'gateway-parallel' || node.type === 'gateway-and') && (
                             <text y="5" textAnchor="middle" fontSize="18" fontWeight="bold" fill="#333">＋</text>
+                          )}
+                          {node.type === 'gateway-inclusive' && (
+                            <circle cx="0" cy="0" r="10" fill="none" stroke="#333" strokeWidth="1.5" />
                           )}
                           <text 
                             y={-node.height/2 - 8} 
@@ -921,47 +1284,23 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
                             y={-node.height/2}
                             width={node.width}
                             height={node.height}
-                            fill="white"
-                            stroke="#2d3748"
+                            fill="#fcfcfc"
+                            stroke="#555"
                             strokeWidth="1.5"
                             rx="5"
                           />
                           
-                          {/* Human user avatar on upper-left inside task box */}
-                          <g transform={`translate(${-node.width/2 + 10}, ${-node.height/2 + 12}) scale(0.65)`}>
-                            <ellipse cx="6" cy="4" rx="3.5" ry="3.5" fill="none" stroke="#2d3748" strokeWidth="1.75" />
-                            <path d="M 1 12 C 1 9, 11 9, 11 12" fill="none" stroke="#2d3748" strokeWidth="1.75" />
-                          </g>
-
                           {/* Center task label text wrapping cleanly */}
                           <text 
                             textAnchor="middle" 
-                            fill="#2d3748" 
-                            fontSize="11" 
-                            fontWeight="bold"
+                            fill="#333" 
+                            fontSize="11.5" 
+                            fontWeight="500"
                             className="font-sans select-none"
                             y={4}
                           >
                             {node.label}
                           </text>
-
-                          {/* Parallel standard lines at bottom of task cards */}
-                          {node.subType === '|||' && (
-                            <g transform="translate(-6, 22)">
-                              <line x1="0" y1="0" x2="0" y2="8" stroke="#4a5568" strokeWidth="1.5" />
-                              <line x1="4" y1="0" x2="4" y2="8" stroke="#4a5568" strokeWidth="1.5" />
-                              <line x1="8" y1="0" x2="8" y2="8" stroke="#4a5568" strokeWidth="1.5" />
-                            </g>
-                          )}
-
-                          {/* User Hamburger menu standard parallel bars */}
-                          {node.subType === '≡' && (
-                            <g transform="translate(-5, 21)">
-                              <line x1="0" y1="0" x2="10" y2="0" stroke="#718096" strokeWidth="1.2" />
-                              <line x1="0" y1="3" x2="10" y2="3" stroke="#718096" strokeWidth="1.2" />
-                              <line x1="0" y1="6" x2="10" y2="6" stroke="#718096" strokeWidth="1.2" />
-                            </g>
-                          )}
                         </g>
                       )}
 
@@ -1059,8 +1398,8 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
 
             </div>
 
-            {/* Conditional Right Inspector Panel */}
-            {isInspectorVisible && (() => {
+            {/* Conditional Right Inspector Panel - Removed per user request */}
+            {false && isInspectorVisible && !selectedNodeId && (() => {
               const selectedNode = nodes.find(n => n.id === selectedNodeId);
               const isTaskNode = selectedNode?.type === 'task';
 
@@ -1187,7 +1526,7 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
                             value={userIdentities}
                             onChange={(e) => {
                               const options = Array.from(e.target.selectedOptions);
-                              setUserIdentities(options.map(o => o.value));
+                              setUserIdentities(options.map((o: any) => o.value));
                             }}
                           >
                             <option value="库管理员">库管理员</option>
@@ -1277,7 +1616,7 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
                                             multiple 
                                             className="w-full border border-slate-200 rounded px-2 py-1.5 outline-none text-xs text-slate-700 bg-white h-20" 
                                             value={dataTables} 
-                                            onChange={(e) => setDataTables(Array.from(e.target.selectedOptions, option => option.value))}
+                                            onChange={(e) => setDataTables(Array.from(e.target.selectedOptions, (option: any) => option.value))}
                                         >
                                             <option value="表A">表A</option>
                                             <option value="表B">表B</option>
@@ -1304,7 +1643,7 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
                                             multiple
                                             className="w-full border border-slate-200 rounded px-2 py-1.5 outline-none text-xs text-slate-700 bg-white h-20" 
                                             value={applicantIdentities} 
-                                            onChange={(e) => setApplicantIdentities(Array.from(e.target.selectedOptions, option => option.value))}
+                                            onChange={(e) => setApplicantIdentities(Array.from(e.target.selectedOptions, (option: any) => option.value))}
                                         >
                                             <option value="库管理员">库管理员</option>
                                             <option value="队列/课题负责人">队列/课题负责人</option>
@@ -1364,7 +1703,7 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
       </div>
 
       {/* --- Part 3: RIGHT PANEL Submitter permissions config --- */}
-      <div className="w-[280px] bg-white border-l border-[#e2e8f5] flex flex-col h-full shrink-0 shadow-sm z-30 select-none">
+      <div className="hidden">
         
         {/* Header row */}
         <div className="p-4 py-3.5 border-b border-[#f1f5fd] select-none">
@@ -1470,7 +1809,871 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
 
         </div>
       </div>
+          </>
+        )}
+      </div>
 
+      {/* Node Property Config Drawer (设置中间属性右侧抽屉) */}
+      <AnimatePresence>
+        {selectedNodeId && (() => {
+          const node = nodes.find(n => n.id === selectedNodeId);
+          if (!node) return null;
+          return (
+            <div 
+              className="fixed inset-0 z-[100] flex justify-end bg-slate-900/30 backdrop-blur-[2px]" 
+              onClick={() => setSelectedNodeId(null)}
+            >
+              <motion.div 
+                initial={{ x: '100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+                className="bg-white w-[460px] h-full shadow-[-4px_0_24px_rgba(0,0,0,0.08)] border-l border-slate-200 flex flex-col" 
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between select-none shrink-0">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+                      <Settings className="w-4 h-4" />
+                    </div>
+                    <h3 className="font-bold text-[15px] text-slate-800">设置中间属性</h3>
+                  </div>
+                  <button 
+                    onClick={() => setSelectedNodeId(null)}
+                    className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Tabs selection */}
+                <div className="px-5 py-2.5 bg-slate-50/50 border-b border-slate-100 shrink-0">
+                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/40 select-none">
+                    {[
+                      { id: 'basic', label: '基础设置' },
+                      { id: 'assignee', label: '办理人设置' }
+                    ].map(tab => {
+                      const isActive = nodeActiveTab === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          onClick={() => setNodeActiveTab(tab.id as any)}
+                          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-bold transition-all duration-200 ${
+                            isActive 
+                              ? 'bg-blue-600 text-white shadow-sm' 
+                              : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
+                          }`}
+                        >
+                          <span>{tab.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Body Content */}
+                <div className="flex-1 p-5 overflow-y-auto space-y-5 custom-scrollbar">
+                  {nodeActiveTab === 'basic' && (
+                    <div className="space-y-4 animate-fade-in">
+                      {/* Section 1: 基础配置 */}
+                      <div className="bg-slate-50/50 border border-slate-200/60 rounded-xl p-4.5 space-y-4 shadow-sm">
+                        <div className="flex items-center gap-2 pb-2 border-b border-slate-200/40 select-none">
+                          <User className="w-4 h-4 text-blue-500" />
+                          <span className="font-bold text-[13px] text-slate-700">基础配置</span>
+                        </div>
+
+                        {/* 节点编码 */}
+                        <div className="space-y-1.5">
+                          <label className="text-slate-600 font-bold text-xs block select-none">节点编码:</label>
+                          <input 
+                            type="text" 
+                            value={node.id}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setNodes(prev => prev.map(item => item.id === node.id ? { ...item, id: val } : item));
+                            }}
+                            className="w-full border border-slate-200 rounded-lg px-3 py-1.5 outline-none text-xs text-slate-700 bg-white h-9 focus:border-blue-500 transition-colors font-mono"
+                          />
+                        </div>
+
+                        {/* 节点名称 */}
+                        <div className="space-y-1.5">
+                          <label className="text-slate-600 font-bold text-xs block select-none">节点名称:</label>
+                          <textarea 
+                            value={node.label || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setNodes(prev => prev.map(item => item.id === node.id ? { ...item, label: val } : item));
+                            }}
+                            className="w-full border border-slate-200 rounded-lg px-3 py-2 outline-none text-xs text-slate-700 bg-white h-18 focus:border-blue-500 transition-colors resize-none"
+                            placeholder="请输入节点名称"
+                          />
+                        </div>
+
+                        {/* 协作方式 */}
+                        <div className="space-y-2">
+                          <label className="text-slate-600 font-bold text-xs block select-none">协作方式:</label>
+                          <div className="flex items-center gap-2.5">
+                            {[
+                              { id: 'or', label: '或签' },
+                              { id: 'and', label: '会签' }
+                            ].map(opt => {
+                              const currentMode = node.cooperationMode || 'or';
+                              const isSelected = currentMode === opt.id;
+                              return (
+                                <button
+                                  key={opt.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setNodes(prev => prev.map(item => item.id === node.id ? { ...item, cooperationMode: opt.id as any } : item));
+                                  }}
+                                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 border rounded-xl text-xs font-semibold transition-all duration-200 ${
+                                    isSelected 
+                                      ? 'bg-blue-50/50 border-blue-500 text-blue-600 shadow-sm' 
+                                      : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50 text-slate-500'
+                                  }`}
+                                >
+                                  <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center transition-colors ${
+                                    isSelected ? 'border-blue-500 bg-blue-500' : 'border-slate-300 bg-white'
+                                  }`}>
+                                    {isSelected && <div className="w-1 h-1 rounded-full bg-white" />}
+                                  </div>
+                                  <span>{opt.label}</span>
+                                  <HelpCircle className="w-3.5 h-3.5 text-slate-300 ml-0.5 shrink-0" />
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* 自定义表单 */}
+                        <div className="space-y-2">
+                          <label className="text-slate-600 font-bold text-xs block select-none">自定义表单:</label>
+                          <div className="flex items-center gap-2.5 w-1/3">
+                            {[
+                              { id: 'no', label: '否' }
+                            ].map(opt => {
+                              const currentCustom = node.useCustomForm || 'no';
+                              const isSelected = currentCustom === opt.id;
+                              return (
+                                <button
+                                  key={opt.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setNodes(prev => prev.map(item => item.id === node.id ? { ...item, useCustomForm: opt.id as any } : item));
+                                  }}
+                                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 border rounded-xl text-xs font-semibold transition-all duration-200 ${
+                                    isSelected 
+                                      ? 'bg-blue-50/50 border-blue-500 text-blue-600 shadow-sm' 
+                                      : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50 text-slate-500'
+                                  }`}
+                                >
+                                  <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center transition-colors ${
+                                    isSelected ? 'border-blue-500 bg-blue-500' : 'border-slate-300 bg-white'
+                                  }`}>
+                                    {isSelected && <div className="w-1 h-1 rounded-full bg-white" />}
+                                  </div>
+                                  <span>{opt.label}</span>
+                                  <HelpCircle className="w-3.5 h-3.5 text-slate-300 ml-0.5 shrink-0" />
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {nodeActiveTab === 'assignee' && (
+                    <div className="space-y-4 animate-fade-in">
+                      <div className="bg-slate-50/50 border border-slate-200/60 rounded-xl p-4.5 space-y-4 shadow-sm">
+                        {/* Title Header */}
+                        <div className="flex items-center gap-2 pb-2.5 border-b border-slate-200/40 select-none">
+                          <Users className="w-4 h-4 text-blue-500" />
+                          <span className="font-bold text-[13px] text-blue-600">办理人设置</span>
+                        </div>
+
+                        {/* Assignee Table */}
+                        <div className="border border-slate-200/80 rounded-xl bg-white overflow-hidden shadow-sm">
+                          {/* Table Headers */}
+                          <div className="grid grid-cols-[1.5fr_1fr_0.7fr] bg-slate-50/70 border-b border-slate-200/60 px-4 py-2.5 text-slate-500 font-bold text-xs select-none">
+                            <div>入库主键</div>
+                            <div className="text-center">权限名称</div>
+                            <div className="text-right">操作</div>
+                          </div>
+
+                          {/* Table Content */}
+                          {(!node.assigneeList || node.assigneeList.length === 0) ? (
+                            <div className="py-9 text-center text-slate-400 text-xs select-none">
+                              暂无数据
+                            </div>
+                          ) : (
+                            <div className="divide-y divide-slate-100 max-h-[220px] overflow-y-auto">
+                              {node.assigneeList.map((item, idx) => (
+                                <div key={idx} className="grid grid-cols-[1.5fr_1fr_0.7fr] px-4 py-2 items-center text-slate-700 text-xs hover:bg-slate-50/50 transition-colors">
+                                  <div className="mr-2">
+                                    <input
+                                      type="text"
+                                      value={item.key}
+                                      onChange={(e) => {
+                                        const nextList = (node.assigneeList || []).map((val, i) => i === idx ? { ...val, key: e.target.value } : val);
+                                        setNodes(prev => prev.map(n => n.id === node.id ? { ...n, assigneeList: nextList } : n));
+                                      }}
+                                      className="w-full border border-slate-200 rounded px-2 py-1 outline-none text-xs text-slate-700 h-8 focus:border-blue-500 bg-white"
+                                      placeholder=""
+                                    />
+                                  </div>
+                                  <div className="text-center font-medium truncate px-2 text-slate-500" title={item.permission}>
+                                    {item.permission}
+                                  </div>
+                                  <div className="text-right">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const nextList = (node.assigneeList || []).filter((_, i) => i !== idx);
+                                        setNodes(prev => prev.map(n => n.id === node.id ? { ...n, assigneeList: nextList } : n));
+                                        showToast('删除办理人成功');
+                                      }}
+                                      className="w-8 h-8 rounded bg-red-500 hover:bg-red-600 text-white transition-colors inline-flex items-center justify-center cursor-pointer shadow-sm"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Dashed Buttons */}
+                        <div className="flex items-center gap-3 select-none">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const currentList = node.assigneeList || [];
+                              const nextList = [...currentList, { key: '', permission: '' }];
+                              setNodes(prev => prev.map(n => n.id === node.id ? { ...n, assigneeList: nextList } : n));
+                            }}
+                            className="flex-1 py-2 border border-dashed border-blue-400 hover:border-blue-500 hover:bg-blue-50/10 text-blue-600 rounded-lg text-xs font-bold transition-all duration-200 flex items-center justify-center gap-1 cursor-pointer"
+                          >
+                            <span>添加行</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsSelectingPreset(true);
+                            }}
+                            className="flex-1 py-2 border border-dashed border-slate-300 hover:border-slate-400 hover:bg-slate-50/20 text-slate-500 rounded-lg text-xs font-bold transition-all duration-200 flex items-center justify-center gap-1 cursor-pointer"
+                          >
+                            <span>选择</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              </motion.div>
+            </div>
+          );
+        })()}
+      </AnimatePresence>
+
+      {/* Edge Property Config Drawer (设置边属性右侧抽屉) */}
+      <AnimatePresence>
+        {selectedEdgeId && (() => {
+          const edge = edges.find(e => e.id === selectedEdgeId);
+          if (!edge) return null;
+          return (
+            <div 
+              className="fixed inset-0 z-[100] flex justify-end bg-slate-900/30 backdrop-blur-[2px]" 
+              onClick={() => setSelectedEdgeId(null)}
+            >
+              <motion.div 
+                initial={{ x: '100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+                className="bg-white w-[380px] h-full shadow-[-4px_0_24px_rgba(0,0,0,0.08)] border-l border-slate-200 flex flex-col" 
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between select-none shrink-0">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+                      <GitFork className="w-4 h-4" />
+                    </div>
+                    <h3 className="font-bold text-[15px] text-slate-800">设置边属性</h3>
+                  </div>
+                  <button 
+                    onClick={() => setSelectedEdgeId(null)}
+                    className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Body */}
+                <div className="flex-1 p-5 overflow-y-auto space-y-5">
+                  <div className="bg-slate-50/70 border border-slate-200/50 rounded-lg p-4 space-y-4">
+                    {/* Inner Title */}
+                    <div className="flex items-center gap-2 pb-2 border-b border-slate-200/40 select-none">
+                      <span className="font-bold text-[13px] text-slate-700">跳转条件配置</span>
+                    </div>
+
+                    {/* Field 1: 跳转名称 */}
+                    <div className="space-y-1.5">
+                      <label className="text-slate-600 font-bold text-xs block select-none">跳转名称</label>
+                      <input 
+                        type="text" 
+                        value={edge.label || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEdges(prev => prev.map(item => item.id === edge.id ? { ...item, label: val } : item));
+                        }}
+                        className="w-full border border-slate-200 rounded px-3 py-1.5 outline-none text-xs text-slate-700 bg-white h-9 focus:border-blue-500 transition-colors placeholder-slate-400"
+                        placeholder="请输入跳转名称（留空则按条件自动生成）"
+                      />
+                    </div>
+
+                    {/* Field 2: 跳转类型 */}
+                    <div className="space-y-1.5">
+                      <label className="text-slate-600 font-bold text-xs block select-none">跳转类型</label>
+                      <select
+                        value="审核通过"
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEdges(prev => prev.map(item => item.id === edge.id ? { ...item, condType: val } : item));
+                        }}
+                        className="w-full border border-slate-200 rounded px-3 py-1.5 outline-none text-xs text-slate-700 bg-white h-9 focus:border-blue-500 transition-colors cursor-pointer"
+                      >
+                        <option value="审核通过">审核通过</option>
+                      </select>
+                    </div>
+
+                    {/* --- FEATURE: 3选1条件配置 (3-choose-1 Condition configuration) --- */}
+                    {(() => {
+                      const mode = edge.condSelectMode || 'userIdentity';
+                      
+                      return (
+                        <div className="space-y-4 pt-1 border-t border-slate-100">
+                          <div className="space-y-1.5">
+                            <label className="text-slate-600 font-bold text-xs block select-none">跳转条件类型</label>
+                            <select
+                              value={mode}
+                              onChange={(e) => {
+                                const selectedKey = e.target.value;
+                                setEdges(prev => prev.map(item => {
+                                  if (item.id === edge.id) {
+                                    const updated = { ...item, condSelectMode: selectedKey as any };
+                                    // Enforce mutually exclusive state upon switching
+                                    if (selectedKey !== 'userIdentity') {
+                                      updated.condUserIdentities = [];
+                                    }
+                                    if (selectedKey !== 'dataVolume') {
+                                      updated.condDataVolumeMin = '';
+                                      updated.condDataVolumeMax = '';
+                                    }
+                                    if (selectedKey !== 'dataTable') {
+                                      updated.condDataTables = [];
+                                    }
+                                    if (selectedKey !== 'spel') {
+                                      updated.condSpel = '';
+                                    }
+                                    return updated;
+                                  }
+                                  return item;
+                                }));
+                              }}
+                              className="w-full border border-slate-200 rounded px-3 py-1.5 outline-none text-xs text-slate-700 bg-white h-9 focus:border-blue-500 transition-colors cursor-pointer font-bold"
+                            >
+                              <option value="userIdentity">用户身份</option>
+                              <option value="dataTable">指标表</option>
+                              <option value="dataVolume">病历数</option>
+                              <option value="spel">spel</option>
+                            </select>
+                          </div>
+
+                          {/* --- Render only selected choice --- */}
+                          {mode === 'userIdentity' && (() => {
+                            const selectedIdentity = edge.condUserIdentities?.[0] || '';
+                            const options = ['普通用户', '库管理员', '课题负责人', '收藏负责人'];
+
+                            return (
+                              <div className="space-y-2 animate-fade-in">
+                                <label className="text-slate-500 font-bold text-[11px] block select-none uppercase tracking-wider">
+                                  用户身份
+                                </label>
+                                <div className="space-y-1.5">
+                                  {options.map((opt) => {
+                                    const isSelected = selectedIdentity === opt;
+                                    return (
+                                      <button
+                                        key={opt}
+                                        type="button"
+                                        onClick={() => {
+                                          setEdges(prev => prev.map(item => item.id === edge.id ? { ...item, condUserIdentities: [opt] } : item));
+                                        }}
+                                        className={`w-full text-left px-3 py-2 rounded-lg border transition-all duration-200 cursor-pointer flex items-center gap-3 select-none ${
+                                          isSelected
+                                            ? 'bg-blue-50/60 border-blue-500/80 shadow-[0_1px_4px_rgba(59,130,246,0.06)]'
+                                            : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
+                                        }`}
+                                      >
+                                        <div className="shrink-0">
+                                          <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center transition-colors ${
+                                            isSelected ? 'border-blue-500 bg-blue-500' : 'border-slate-300 bg-white'
+                                          }`}>
+                                            {isSelected && (
+                                              <div className="w-1 h-1 rounded-full bg-white" />
+                                            )}
+                                          </div>
+                                        </div>
+                                        <span className={`text-xs font-bold transition-colors ${isSelected ? 'text-blue-700' : 'text-slate-700'}`}>
+                                          {opt}
+                                        </span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          {mode === 'dataVolume' && (
+                            <div className="space-y-2 animate-fade-in">
+                              <label className="text-slate-500 font-bold text-[11px] block select-none">
+                                病历数范围配置
+                              </label>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="space-y-1">
+                                  <span className="text-[10px] text-slate-400 font-medium">最小数量 (条)</span>
+                                  <input 
+                                    type="number" 
+                                    min="0"
+                                    placeholder="无下限"
+                                    value={edge.condDataVolumeMin || ''}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setEdges(prev => prev.map(item => item.id === edge.id ? { ...item, condDataVolumeMin: val } : item));
+                                    }}
+                                    className="w-full border border-slate-200 rounded px-2.5 py-1 text-xs text-slate-700 bg-white h-8 focus:border-blue-500 transition-colors"
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <span className="text-[10px] text-slate-400 font-medium">最大数量 (条)</span>
+                                  <input 
+                                    type="number" 
+                                    min="0"
+                                    placeholder="无上限"
+                                    value={edge.condDataVolumeMax || ''}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setEdges(prev => prev.map(item => item.id === edge.id ? { ...item, condDataVolumeMax: val } : item));
+                                    }}
+                                    className="w-full border border-slate-200 rounded px-2.5 py-1 text-xs text-slate-700 bg-white h-8 focus:border-blue-500 transition-colors"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {mode === 'dataTable' && (() => {
+                            const selectedTables = edge.condDataTables || [];
+                            const tables = ['病历信息表', '临床表型表', '测序样本表', '生存随访表', '药品成分表', '基因组变异表'];
+                            
+                            const toggleTable = (tableName: string) => {
+                              const newTables = selectedTables.includes(tableName)
+                                ? selectedTables.filter(t => t !== tableName)
+                                : [...selectedTables, tableName];
+                              setEdges(prev => prev.map(item => item.id === edge.id ? { ...item, condDataTables: newTables } : item));
+                            };
+
+                            const filteredTables = tables.filter(table => 
+                              table.toLowerCase().includes(tableSearch.toLowerCase())
+                            );
+
+                            return (
+                              <div className="space-y-2 animate-fade-in">
+                                <label className="text-slate-500 font-bold text-[11px] block select-none uppercase tracking-wider">
+                                  指标表
+                                </label>
+                                
+                                <div className="relative">
+                                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                                  <input
+                                    type="text"
+                                    placeholder="搜索指标表..."
+                                    value={tableSearch}
+                                    onChange={(e) => setTableSearch(e.target.value)}
+                                    className="w-full border border-slate-200 rounded-lg pl-8 pr-2.5 py-1 text-xs text-slate-700 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-100 transition-all placeholder:text-slate-400 outline-none h-8"
+                                  />
+                                  {tableSearch && (
+                                    <button 
+                                      type="button"
+                                      onClick={() => setTableSearch('')}
+                                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+
+                                <div className="bg-white border border-slate-200 rounded-lg p-2.5 max-h-[140px] overflow-y-auto space-y-1.5 custom-scrollbar">
+                                  {filteredTables.length > 0 ? (
+                                    filteredTables.map((table) => {
+                                      const isChecked = selectedTables.includes(table);
+                                      return (
+                                        <label 
+                                          key={table} 
+                                          className="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-50 cursor-pointer select-none transition-colors"
+                                        >
+                                          <input 
+                                            type="checkbox"
+                                            checked={isChecked}
+                                            onChange={() => toggleTable(table)}
+                                            className="w-3.5 h-3.5 rounded text-blue-600 accent-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer"
+                                          />
+                                          <span className={`text-[11px] font-medium transition-colors ${isChecked ? 'text-blue-600 font-bold' : 'text-slate-600'}`}>
+                                            {table}
+                                          </span>
+                                        </label>
+                                      );
+                                    })
+                                  ) : (
+                                    <div className="text-[11px] text-slate-400 text-center py-4 select-none">
+                                      未查找到相关指标表
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          {mode === 'spel' && (
+                            <div className="space-y-2 animate-fade-in">
+                              <label className="text-slate-500 font-bold text-[11px] block select-none uppercase tracking-wider">
+                                SpEL 表达式
+                              </label>
+                              <input 
+                                type="text"
+                                placeholder="输入 SpEL 表达式，如: #user.identity == '普通用户'"
+                                value={edge.condSpel || ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setEdges(prev => prev.map(item => item.id === edge.id ? { ...item, condSpel: val } : item));
+                                }}
+                                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-100 transition-all outline-none"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          );
+        })()}
+      </AnimatePresence>
+
+      {/* 人员选择 弹出窗 */}
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {isSelectingPreset && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/40 backdrop-blur-[2px]" onClick={() => setIsSelectingPreset(false)}>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.15 }}
+                className="bg-white w-[92%] max-w-5xl h-[85vh] max-h-[680px] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200"
+                onClick={(e) => e.stopPropagation()}
+              >
+              {/* Header */}
+              <div className="px-6 py-4.5 border-b border-slate-100 flex items-center justify-between select-none shrink-0">
+                <span className="font-bold text-base text-slate-800">人员选择</span>
+                <button
+                  onClick={() => setIsSelectingPreset(false)}
+                  className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Tabs Row */}
+              <div className="px-6 py-3 border-b border-slate-100/60 bg-slate-50/20 flex items-center gap-4 shrink-0">
+                <button
+                  onClick={() => {
+                    setPersonnelActiveTab('user');
+                    setSelectedPresetIndices([]);
+                  }}
+                  className={`font-bold text-xs px-4 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    personnelActiveTab === 'user'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100/60'
+                  }`}
+                >
+                  用户
+                </button>
+                <button
+                  onClick={() => {
+                    setPersonnelActiveTab('spel');
+                    setSelectedPresetIndices([]);
+                  }}
+                  className={`font-bold text-xs px-4 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    personnelActiveTab === 'spel'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100/60'
+                  }`}
+                >
+                  SpEL表达式
+                </button>
+              </div>
+
+              {/* Main Content columns */}
+              <div className="flex-1 min-h-0 grid grid-cols-[240px_1fr] p-5 gap-5 overflow-hidden">
+                {/* Left col: 组织架构 */}
+                <div className="border border-slate-200 rounded-xl bg-slate-50/20 flex flex-col overflow-hidden">
+                  <div className="p-3 border-b border-slate-150 bg-white flex items-center justify-between select-none shrink-0">
+                    <div className="flex items-center gap-2 text-slate-700 font-bold text-xs">
+                      <FolderOpen className="w-4 h-4 text-blue-500" />
+                      <span>组织架构</span>
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-slate-400" />
+                  </div>
+                  
+                  <div className="p-3 shrink-0 bg-white border-b border-slate-100">
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={deptSearch}
+                        onChange={(e) => setDeptSearch(e.target.value)}
+                        placeholder="搜索部门名称"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-500 focus:bg-white transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex-1 flex flex-col items-center justify-center text-slate-400 text-xs py-10 select-none bg-white font-medium">
+                    暂无数据
+                  </div>
+                </div>
+
+                {/* Right col: Filters + Table */}
+                <div className="flex flex-col min-h-0 space-y-4">
+                  {/* Filters Card */}
+                  <div className="bg-slate-50/70 border border-slate-200/60 rounded-xl p-4.5 space-y-4 shadow-sm shrink-0">
+                    {/* Filter Inputs Grid */}
+                    <div className="grid grid-cols-[auto_1fr_auto_1fr_auto_1.6fr] gap-x-3.5 gap-y-3 items-center text-xs text-slate-600 font-bold select-none">
+                      <div className="text-right whitespace-nowrap">权限编码</div>
+                      <input
+                        type="text"
+                        value={searchPermissionCode}
+                        onChange={(e) => setSearchPermissionCode(e.target.value)}
+                        placeholder="请输入权限编码"
+                        className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-500 transition-colors w-full h-9"
+                      />
+
+                      <div className="text-right whitespace-nowrap">权限名称</div>
+                      <input
+                        type="text"
+                        value={searchPermissionName}
+                        onChange={(e) => setSearchPermissionName(e.target.value)}
+                        placeholder="请输入权限名称"
+                        className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-500 transition-colors w-full h-9"
+                      />
+
+                      <div className="text-right whitespace-nowrap">创建时间</div>
+                      <div className="flex items-center gap-2 border border-slate-200 bg-white rounded-lg px-2.5 h-9 text-slate-700 w-full">
+                        <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <input
+                          type="text"
+                          value={searchStartDate}
+                          onChange={(e) => setSearchStartDate(e.target.value)}
+                          placeholder="开始日期"
+                          className="bg-transparent text-xs w-full min-w-0 outline-none text-slate-700 placeholder-slate-400"
+                        />
+                        <span className="text-slate-400 select-none">-</span>
+                        <input
+                          type="text"
+                          value={searchEndDate}
+                          onChange={(e) => setSearchEndDate(e.target.value)}
+                          placeholder="结束日期"
+                          className="bg-transparent text-xs w-full min-w-0 outline-none text-slate-700 placeholder-slate-400 animate-none"
+                        />
+                        <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      </div>
+                    </div>
+
+                    {/* Filter Buttons */}
+                    <div className="flex items-center justify-between pt-1 border-t border-slate-100/40">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            showToast('搜索完成');
+                          }}
+                          className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-1.5 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Search className="w-3.5 h-3.5" />
+                          <span>搜索</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handlePresetReset}
+                          className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold px-4 py-1.5 rounded-lg transition-colors cursor-pointer"
+                        >
+                          重置
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handlePresetConfirm}
+                        className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-5 py-1.5 rounded-lg shadow-sm transition-colors cursor-pointer"
+                      >
+                        确定
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Preset list data table */}
+                  <div className="border border-slate-200 rounded-xl bg-white flex-1 min-h-0 flex flex-col overflow-hidden shadow-sm">
+                    <div className="flex-1 overflow-auto custom-scrollbar">
+                      <table className="w-full text-xs text-left text-slate-600 border-collapse">
+                        <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold sticky top-0 select-none z-10">
+                          <tr>
+                            <th className="px-4 py-3 w-10 text-center">
+                              <input
+                                type="checkbox"
+                                checked={
+                                  personnelActiveTab === 'user'
+                                    ? filteredPresets.length > 0 && filteredPresets.every(p => selectedPresetIndices.includes(PERSONNEL_PRESETS.indexOf(p)))
+                                    : filteredSpelPresets.length > 0 && filteredSpelPresets.every(p => selectedPresetIndices.includes(SPEL_PRESETS.indexOf(p)))
+                                }
+                                onChange={handleSelectAllPreset}
+                                className="w-3.5 h-3.5 text-blue-600 accent-blue-600 border-slate-300 rounded cursor-pointer"
+                              />
+                            </th>
+                            <th className="px-4 py-3">权限名称</th>
+                            <th className="px-4 py-3">权限编码</th>
+                            <th className="px-4 py-3">入库主键</th>
+                            <th className="px-4 py-3">权限分组</th>
+                            <th className="px-4 py-3">创建时间</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {personnelActiveTab === 'user' ? (
+                            filteredPresets.map((preset) => {
+                              const origIdx = PERSONNEL_PRESETS.indexOf(preset);
+                              const isSelected = selectedPresetIndices.includes(origIdx);
+                              return (
+                                <tr
+                                  key={origIdx}
+                                  onClick={() => handleTogglePresetRow(origIdx)}
+                                  className={`hover:bg-slate-50/50 transition-colors cursor-pointer ${
+                                    isSelected ? 'bg-blue-50/20' : ''
+                                  }`}
+                                >
+                                  <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={() => handleTogglePresetRow(origIdx)}
+                                      className="w-3.5 h-3.5 text-blue-600 accent-blue-600 border-slate-300 rounded cursor-pointer"
+                                    />
+                                  </td>
+                                  <td className="px-4 py-3 font-bold text-slate-700">{preset.name}</td>
+                                  <td className="px-4 py-3 text-slate-500 font-mono">{preset.code}</td>
+                                  <td className="px-4 py-3 text-slate-600 font-mono">{preset.key}</td>
+                                  <td className="px-4 py-3 text-slate-500">{preset.group}</td>
+                                  <td className="px-4 py-3 text-slate-400 font-mono">{preset.created}</td>
+                                </tr>
+                              );
+                            })
+                          ) : (
+                            filteredSpelPresets.map((preset) => {
+                              const origIdx = SPEL_PRESETS.indexOf(preset);
+                              const isSelected = selectedPresetIndices.includes(origIdx);
+                              return (
+                                <tr
+                                  key={origIdx}
+                                  onClick={() => handleTogglePresetRow(origIdx)}
+                                  className={`hover:bg-slate-50/50 transition-colors cursor-pointer ${
+                                    isSelected ? 'bg-blue-50/20' : ''
+                                  }`}
+                                >
+                                  <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={() => handleTogglePresetRow(origIdx)}
+                                      className="w-3.5 h-3.5 text-blue-600 accent-blue-600 border-slate-300 rounded cursor-pointer"
+                                    />
+                                  </td>
+                                  <td className="px-4 py-3 font-bold text-slate-700">{preset.name}</td>
+                                  <td className="px-4 py-3 text-slate-500 font-mono">{preset.code}</td>
+                                  <td className="px-4 py-3 text-slate-600 font-mono">{preset.key}</td>
+                                  <td className="px-4 py-3 text-slate-500">{preset.group}</td>
+                                  <td className="px-4 py-3 text-slate-400 font-mono">{preset.created}</td>
+                                </tr>
+                              );
+                            })
+                          )}
+                          {((personnelActiveTab === 'user' && filteredPresets.length === 0) ||
+                            (personnelActiveTab === 'spel' && filteredSpelPresets.length === 0)) && (
+                            <tr>
+                              <td colSpan={6} className="text-center text-slate-400 py-12 select-none">
+                                暂无数据
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Pagination Row */}
+                    {personnelActiveTab === 'spel' && (
+                      <div className="px-4 py-3 border-t border-slate-100 bg-slate-50/40 flex items-center justify-start text-xs text-slate-500 gap-3.5 select-none shrink-0">
+                        <div className="flex items-center gap-1.5">
+                          <button type="button" className="p-1 hover:bg-slate-200/60 rounded text-slate-400 transition-colors cursor-not-allowed">
+                            <ChevronLeft className="w-3.5 h-3.5" />
+                          </button>
+                          <span className="px-2 py-0.5 text-blue-600 font-bold bg-blue-50/50 rounded border border-blue-100/30">1</span>
+                          <button type="button" className="p-1 hover:bg-slate-200/60 rounded text-slate-400 transition-colors cursor-not-allowed">
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span>前往</span>
+                          <input 
+                            type="text" 
+                            defaultValue="1" 
+                            disabled
+                            className="w-8 h-6 text-center border border-slate-200 rounded bg-white text-slate-700 outline-none text-xs font-bold"
+                          />
+                          <span>页</span>
+                        </div>
+                        <div className="text-slate-400 ml-1">
+                          共 1 条
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }
