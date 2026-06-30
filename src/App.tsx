@@ -34,6 +34,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { WorkflowDesigner } from './components/WorkflowDesigner';
 import { ApprovalCenter } from './components/ApprovalCenter';
 import { DatabaseSourceManager } from './components/DatabaseSourceManager';
+import { Dashboard } from './components/Dashboard';
 
 // --- Types ---
 interface MenuItem {
@@ -70,7 +71,8 @@ interface WorkflowItem {
 // --- Data ---
 const MENU_ITEMS: MenuItem[] = [
   { id: 'dashboard', name: '科研驾驶舱', icon: LayoutDashboard },
-  { id: 'database', name: '数据库源管理', icon: Database },
+  { id: 'database', name: '数据库管理', icon: Database },
+  { id: 'approval-center', name: '审批中心', icon: ClipboardCheck },
   { id: 'logs', name: '日志管理', icon: FileClock },
   { 
     id: 'config', 
@@ -86,8 +88,6 @@ const MENU_ITEMS: MenuItem[] = [
       { id: 'dictionary', name: '字典库' },
     ]
   },
-  { id: 'workflow', name: '工作流配置', icon: GitBranch },
-  { id: 'approval-center', name: '审批中心', icon: ClipboardCheck },
 ];
 
 const DICTIONARY_LIST: DictionaryEntry[] = [
@@ -144,23 +144,37 @@ const SEED_WORKFLOWS: WorkflowItem[] = [
 ];
 
 // --- Sidebar Component ---
-const Sidebar = ({ activeItem, setActiveItem, expandedMenus, toggleMenu, onSelectTab }: any) => {
+const Sidebar = ({ activeItem, setActiveItem, expandedMenus, toggleMenu, onSelectTab, isCollapsed, toggleCollapsed }: any) => {
   return (
-    <div className="w-64 bg-[#0c1b3d] text-white flex flex-col h-full border-r border-slate-700 select-none shrink-0">
-      <div className="p-4 flex items-center gap-3 border-b border-indigo-950/40">
-        <div className="w-8 h-8 bg-blue-500 rounded flex items-center justify-center">
+    <div className={`${isCollapsed ? 'w-16' : 'w-64'} bg-[#0c1b3d] text-white flex flex-col h-full border-r border-slate-700 select-none shrink-0 transition-all duration-300 relative z-20`}>
+      <div className={`p-4 flex items-center h-16 border-b border-indigo-950/40 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
+        {!isCollapsed && (
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="w-8 h-8 shrink-0 bg-blue-500 rounded flex items-center justify-center">
+                <Database className="w-5 h-5 text-white" />
+            </div>
+            <h1 className="font-bold text-[15px] tracking-tight whitespace-nowrap">科研数据管理平台</h1>
+          </div>
+        )}
+        {isCollapsed && (
+          <div className="w-8 h-8 shrink-0 bg-blue-500 rounded flex items-center justify-center mx-auto cursor-pointer" onClick={toggleCollapsed} title="展开菜单">
             <Database className="w-5 h-5 text-white" />
-        </div>
-        <h1 className="font-bold text-base tracking-tight">科研数据管理平台</h1>
+          </div>
+        )}
+        {!isCollapsed && (
+           <button onClick={toggleCollapsed} className="p-1 hover:bg-slate-800 rounded shrink-0">
+             <Menu className="w-4 h-4 text-slate-400" />
+           </button>
+        )}
       </div>
 
-      <nav className="flex-1 py-4 overflow-y-auto custom-scrollbar">
+      <nav className="flex-1 py-4 overflow-y-auto overflow-x-hidden custom-scrollbar">
         {MENU_ITEMS.map((item) => (
-          <div key={item.id} className="mb-1">
+          <div key={item.id} className="mb-1 relative group">
             <div 
               onClick={() => {
                 if (item.children) {
-                  toggleMenu(item.id);
+                   if (isCollapsed) { toggleCollapsed(); toggleMenu(item.id); } else { toggleMenu(item.id); }
                 } else {
                   setActiveItem(item.id);
                   onSelectTab(item.id, item.name);
@@ -168,18 +182,19 @@ const Sidebar = ({ activeItem, setActiveItem, expandedMenus, toggleMenu, onSelec
               }}
               className={`px-4 py-3 flex items-center justify-between cursor-pointer transition-colors hover:bg-white/10 ${
                 activeItem === item.id || (item.children && item.children.some(c => c.id === activeItem)) ? 'bg-blue-600/35' : ''
-              }`}
+              } ${isCollapsed ? 'justify-center px-0' : ''}`}
+              title={isCollapsed ? item.name : undefined}
             >
-              <div className="flex items-center gap-3">
-                <item.icon className={`w-5 h-5 ${activeItem === item.id ? 'text-blue-400' : 'opacity-75'}`} />
-                <span className={`text-[14px] font-medium ${activeItem === item.id ? 'text-blue-400 font-semibold' : ''}`}>{item.name}</span>
+              <div className={`flex items-center ${isCollapsed ? 'justify-center w-full' : 'gap-3'}`}>
+                <item.icon className={`w-5 h-5 shrink-0 ${activeItem === item.id ? 'text-blue-400' : 'opacity-75'}`} />
+                {!isCollapsed && <span className={`text-[14px] font-medium whitespace-nowrap ${activeItem === item.id ? 'text-blue-400 font-semibold' : ''}`}>{item.name}</span>}
               </div>
-              {item.children && (
-                expandedMenus.includes(item.id) ? <ChevronDown className="w-4 h-4 opacity-50" /> : <ChevronRight className="w-4 h-4 opacity-50" />
+              {!isCollapsed && item.children && (
+                expandedMenus.includes(item.id) ? <ChevronDown className="w-4 h-4 opacity-50 shrink-0" /> : <ChevronRight className="w-4 h-4 opacity-50 shrink-0" />
               )}
             </div>
 
-            {item.children && expandedMenus.includes(item.id) && (
+            {!isCollapsed && item.children && expandedMenus.includes(item.id) && (
               <div className="bg-[#081329]">
                 {item.children.map((child) => (
                   <div 
@@ -192,14 +207,44 @@ const Sidebar = ({ activeItem, setActiveItem, expandedMenus, toggleMenu, onSelec
                       activeItem === child.id ? 'text-blue-400 font-semibold bg-blue-950/20' : 'text-slate-400'
                     }`}
                   >
-                    <span className="text-[13px]">{child.name}</span>
+                    <span className="text-[13px] whitespace-nowrap">{child.name}</span>
                   </div>
                 ))}
+              </div>
+            )}
+            
+            {/* Tooltip for collapsed state */}
+            {isCollapsed && (
+              <div className="absolute left-full top-0 ml-1 hidden group-hover:block z-50">
+                <div className="bg-[#0c1b3d] border border-slate-700 rounded shadow-lg py-1 px-2 whitespace-nowrap min-w-[120px]">
+                   <div className="text-[13px] font-medium text-white mb-1 px-2 py-1 border-b border-slate-700">{item.name}</div>
+                   {item.children && item.children.map(child => (
+                     <div 
+                       key={child.id}
+                       onClick={() => {
+                          setActiveItem(child.id);
+                          onSelectTab(child.id, child.name);
+                       }}
+                       className={`px-2 py-1.5 cursor-pointer hover:text-blue-400 transition-colors text-[13px] ${
+                          activeItem === child.id ? 'text-blue-400 bg-blue-950/20 rounded' : 'text-slate-300'
+                       }`}
+                     >
+                       {child.name}
+                     </div>
+                   ))}
+                </div>
               </div>
             )}
           </div>
         ))}
       </nav>
+      {isCollapsed && (
+         <div className="p-4 flex justify-center border-t border-indigo-950/40">
+           <button onClick={toggleCollapsed} className="p-1 hover:bg-slate-800 rounded">
+             <Menu className="w-4 h-4 text-slate-400" />
+           </button>
+         </div>
+      )}
     </div>
   );
 };
@@ -256,13 +301,13 @@ const Modal = ({ isOpen, onClose, title, children }: any) => (
 // --- App Component ---
 export default function App() {
   // Navigation & Tabs States
-  const [activeItem, setActiveItem] = useState('workflow'); // Start on work flow list by default to match "流程管理" view in image
+  const [activeItem, setActiveItem] = useState('dashboard');
   const [expandedMenus, setExpandedMenus] = useState(['config']);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [tabs, setTabs] = useState([
-    { id: 'dictionary', name: '首页', closable: false },
-    { id: 'workflow', name: '流程管理', closable: true }
+    { id: 'dashboard', name: '科研驾驶舱', closable: false }
   ]);
-  const [activeTab, setActiveTab] = useState('workflow');
+  const [activeTab, setActiveTab] = useState('dashboard');
 
   // Dictionary States
   const [activeDictionaryId, setActiveDictionaryId] = useState('1');
@@ -309,7 +354,10 @@ export default function App() {
       tabName = '流程管理';
     } else if (id === 'database') {
       tabId = 'database';
-      tabName = '数据库源管理';
+      tabName = '数据库管理';
+    } else if (id === 'dashboard') {
+      tabId = 'dashboard';
+      tabName = '科研驾驶舱';
     } else {
       tabId = 'dictionary';
       tabName = '首页';
@@ -525,26 +573,13 @@ export default function App() {
         expandedMenus={expandedMenus}
         toggleMenu={toggleMenu}
         onSelectTab={handleSelectTab}
+        isCollapsed={isSidebarCollapsed}
+        toggleCollapsed={() => setIsSidebarCollapsed(prev => !prev)}
       />
 
       <div className="flex-1 flex flex-col min-w-0 h-full relative">
         {/* Repeating watermark security overlay to exactly match her screenshot environment design beautifully */}
-        <div className="absolute inset-x-0 bottom-0 top-14 pointer-events-none opacity-80 watermark-bg z-0" />
-
-        {/* Top Header */}
-        <header className="h-14 bg-[#0a1835] text-white flex items-center justify-between px-6 z-10 shrink-0">
-            <div className="flex items-center gap-2">
-               <span className="text-xs bg-blue-500 text-white font-bold px-1.5 py-0.5 rounded">PRO</span>
-               <span className="text-sm font-semibold tracking-wide text-slate-200">系统数据运行监视与控制中心</span>
-            </div>
-            <div className="flex items-center gap-3 cursor-pointer group">
-                <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700 group-hover:bg-slate-700 transition-colors shadow-sm">
-                    <User className="w-4 h-4 text-slate-300" />
-                </div>
-                <span className="text-sm font-medium text-slate-200">科研演示02</span>
-                <Settings className="w-4 h-4 text-slate-400 hover:text-white transition-colors" />
-            </div>
-        </header>
+        <div className="absolute inset-x-0 bottom-0 top-0 pointer-events-none opacity-80 watermark-bg z-0" />
 
         {/* Browser Tabs Header Bar */}
         <div className="bg-[#e9eff5] border-b border-slate-300/80 px-4 pt-1.5 flex items-end justify-between select-none z-10 shrink-0">
@@ -561,7 +596,9 @@ export default function App() {
                         ? 'approval-center' 
                         : tab.id === 'database'
                           ? 'database'
-                          : 'dictionary'
+                          : tab.id === 'dashboard'
+                            ? 'dashboard'
+                            : 'dictionary'
                   );
                 }}
                 className={`px-4 py-1.5 rounded-t-md text-[13px] font-medium cursor-pointer transition-all duration-150 flex items-center gap-2 border-t border-x ${
@@ -588,7 +625,9 @@ export default function App() {
                               ? 'approval-center' 
                               : fallback === 'database'
                                 ? 'database'
-                                : 'dictionary'
+                                : fallback === 'dashboard'
+                                  ? 'dashboard'
+                                  : 'dictionary'
                         );
                       }
                     }}
@@ -603,7 +642,7 @@ export default function App() {
         </div>
 
         {/* Content View Router Panel */}
-        <main className="flex-1 p-4 overflow-hidden flex flex-col z-10">
+        <main className={`flex-1 overflow-hidden flex flex-col z-10 ${activeTab === 'dashboard' ? '' : 'p-4'}`}>
           <AnimatePresence mode="wait">
             {activeTab === 'workflow' ? (
               designerWf ? (
@@ -871,6 +910,8 @@ export default function App() {
               <ApprovalCenter workflows={workflows} />
             ) : activeTab === 'database' ? (
               <DatabaseSourceManager />
+            ) : activeTab === 'dashboard' ? (
+              <Dashboard />
             ) : (
               // Original Dictionary Main Editor Window component
               <motion.div 

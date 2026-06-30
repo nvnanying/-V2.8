@@ -381,13 +381,21 @@ const DEFAULT_MY_REVIEWS: ExportApplication[] = [
   }
 ];
 
+const PERMISSION_MOCK_DATA = [
+  { id: '1', dataSource: '患者收藏', applyContent: '新建1', permissions: ['患者全息视图'], dept: '3-2级部门1', applicant: 'wwr1', applyTime: '2026-05-08 16:33', status: '审批通过', opinion: '-', approveTime: '2026-05-08 16:34' },
+  { id: '2', dataSource: '患者收藏', applyContent: '患者收藏新增', permissions: ['患者全息视图'], dept: '3-2级部门1', applicant: 'wwr1', applyTime: '2026-05-08 16:22', status: '待审批', opinion: '-', approveTime: '-' },
+  { id: '3', dataSource: '患者收藏', applyContent: '检索收藏', permissions: ['患者全息视图'], dept: '3-2级部门1', applicant: 'wwr1', applyTime: '2026-05-08 16:20', status: '审批通过', opinion: '1', approveTime: '2026-05-08 16:20' },
+  { id: '4', dataSource: '患者收藏', applyContent: '检索收藏', permissions: ['详情权限'], dept: '3-2级部门1', applicant: 'wwr1', applyTime: '2026-05-08 15:54', status: '审批通过', opinion: '-', approveTime: '2026-05-08 15:54' },
+  { id: '5', dataSource: '患者收藏', applyContent: 'WWW', permissions: ['详情权限', '患者全息视图'], dept: '3-2级部门1', applicant: 'wwr1', applyTime: '2026-05-08 14:57', status: '审批通过', opinion: '-', approveTime: '2026-05-08 14:57' },
+];
+
 interface ApprovalCenterProps {
   workflows: any[];
 }
 
 export const ApprovalCenter = ({ workflows }: ApprovalCenterProps) => {
   // Navigation: 'overview' | 'my-applications' | 'my-approvals' | 'export-detail'
-  const [currentView, setCurrentView] = useState<'overview' | 'my-applications' | 'my-approvals' | 'export-detail'>('overview');
+  const [currentView, setCurrentView] = useState<'my-approvals' | 'export-detail'>('my-approvals');
   const [detailItem, setDetailItem] = useState<ExportApplication | null>(null);
   const [applications, setApplications] = useState<ApplicationRequest[]>(SEED_APPLICATIONS);
   
@@ -416,6 +424,7 @@ export const ApprovalCenter = ({ workflows }: ApprovalCenterProps) => {
   const [reviewSearchContent, setReviewSearchContent] = useState('');
   const [showApprovalActionModal, setShowApprovalActionModal] = useState<ExportApplication | null>(null);
   const [approvalActionComment, setApprovalActionComment] = useState('');
+  const [approvalResult, setApprovalResult] = useState<'审批通过' | '审批拒绝'>('审批通过');
   const [showInlineApproval, setShowInlineApproval] = useState(false);
   
   // Filters
@@ -1310,17 +1319,6 @@ export const ApprovalCenter = ({ workflows }: ApprovalCenterProps) => {
             exit={{ opacity: 0, y: -5 }}
             className="flex-grow flex flex-col space-y-4"
           >
-            {/* Header section with back button and Title */}
-            <div className="flex items-center gap-3 select-none">
-              <button 
-                onClick={() => setCurrentView('overview')}
-                className="p-1 rounded text-slate-705 hover:text-slate-905 hover:bg-slate-200/50 transition-colors cursor-pointer"
-              >
-                <ArrowLeft className="w-5 h-5 font-bold" />
-              </button>
-              <h2 className="text-base font-bold text-slate-800 tracking-wide">审批详情</h2>
-            </div>
-
             {/* Custom styled application panels matching image 2 exactly */}
             <div className="bg-slate-50 p-5 rounded-lg border border-slate-200 shadow-sm space-y-4 flex-1 flex flex-col relative min-h-[500px]">
               
@@ -1365,73 +1363,106 @@ export const ApprovalCenter = ({ workflows }: ApprovalCenterProps) => {
 
               {/* Filters Block */}
               <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-4 z-10 select-none text-slate-700">
-                <div className="flex flex-wrap items-center gap-5 text-xs font-medium">
-                  {/* 数据来源 */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-500 font-semibold">数据来源:</span>
-                    <div className="relative">
-                      <select 
-                        value={reviewDbSource}
-                        onChange={(e) => setReviewDbSource(e.target.value)}
-                        className="appearance-none bg-white border border-slate-200 rounded px-3 py-1.5 pr-8 text-xs text-slate-800 outline-none w-[130px] font-medium"
-                      >
-                        <option value="">请选择</option>
-                        <option value="通用科研库">通用科研库</option>
-                        <option value="公共对照人群库">公共对照人群库</option>
-                        <option value="肿瘤免疫多组学科研库">肿瘤免疫多组学科研库</option>
-                      </select>
-                      <ChevronDown className="w-3.5 h-3.5 absolute right-2 top-2 text-slate-400 pointer-events-none" />
+                {selectedReviewTab === 'permission' ? (
+                  <div className="flex flex-wrap items-center gap-5 text-xs font-medium">
+                    {/* 申请内容 */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-500 font-semibold">申请内容:</span>
+                      <div className="relative flex items-center h-[28px] border border-slate-200 rounded bg-white px-2.5">
+                        <Search className="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0" />
+                        <input 
+                          type="text" 
+                          placeholder="请输入" 
+                          value={reviewSearchContent}
+                          onChange={(e) => setReviewSearchContent(e.target.value)}
+                          className="bg-transparent border-none outline-none text-[11px] font-medium text-slate-700 w-[130px]"
+                        />
+                      </div>
+                    </div>
+                    {/* 申请时间 */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-500 font-semibold">申请时间:</span>
+                      <div className="relative flex items-center h-[28px] border border-slate-200 rounded bg-white shadow-xs px-2.5">
+                        <Calendar className="w-3.5 h-3.5 text-slate-400 mr-2 shrink-0" />
+                        <input 
+                          type="text" 
+                          placeholder="开始时间 - 结束时间" 
+                          value={reviewTimeRange}
+                          onChange={(e) => setReviewTimeRange(e.target.value)}
+                          className="bg-transparent border-none outline-none text-[11px] font-medium text-slate-700 w-[140px]"
+                        />
+                      </div>
                     </div>
                   </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-5 text-xs font-medium">
+                    {/* 数据来源 */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-500 font-semibold">数据来源:</span>
+                      <div className="relative">
+                        <select 
+                          value={reviewDbSource}
+                          onChange={(e) => setReviewDbSource(e.target.value)}
+                          className="appearance-none bg-white border border-slate-200 rounded px-3 py-1.5 pr-8 text-xs text-slate-800 outline-none w-[130px] font-medium"
+                        >
+                          <option value="">请选择</option>
+                          <option value="通用科研库">通用科研库</option>
+                          <option value="公共对照人群库">公共对照人群库</option>
+                          <option value="肿瘤免疫多组学科研库">肿瘤免疫多组学科研库</option>
+                        </select>
+                        <ChevronDown className="w-3.5 h-3.5 absolute right-2 top-2 text-slate-400 pointer-events-none" />
+                      </div>
+                    </div>
 
-                  {/* 审批状态 */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-500 font-semibold">审批状态:</span>
-                    <div className="relative">
-                      <select 
-                        value={reviewStatus}
-                        onChange={(e) => setReviewStatus(e.target.value)}
-                        className="appearance-none bg-white border border-slate-200 rounded px-3 py-1.5 pr-8 text-xs text-slate-800 outline-none w-[130px] font-medium"
-                      >
-                        <option value="">请选择</option>
-                        <option value="待审批">待审批</option>
-                        <option value="审批通过">审批通过</option>
-                        <option value="已驳回">已驳回</option>
-                      </select>
-                      <ChevronDown className="w-3.5 h-3.5 absolute right-2 top-2 text-slate-400 pointer-events-none" />
+                    {/* 审批状态 */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-500 font-semibold">审批状态:</span>
+                      <div className="relative">
+                        <select 
+                          value={reviewStatus}
+                          onChange={(e) => setReviewStatus(e.target.value)}
+                          className="appearance-none bg-white border border-slate-200 rounded px-3 py-1.5 pr-8 text-xs text-slate-800 outline-none w-[130px] font-medium"
+                        >
+                          <option value="">请选择</option>
+                          <option value="待审批">待审批</option>
+                          <option value="审批通过">审批通过</option>
+                          <option value="已驳回">已驳回</option>
+                        </select>
+                        <ChevronDown className="w-3.5 h-3.5 absolute right-2 top-2 text-slate-400 pointer-events-none" />
+                      </div>
                     </div>
-                  </div>
 
-                  {/* 申请时间 */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-500 font-semibold">申请时间:</span>
-                    <div className="relative flex items-center h-[28px] border border-slate-200 rounded bg-white shadow-xs px-2.5">
-                      <Calendar className="w-3.5 h-3.5 text-slate-400 mr-2 shrink-0" />
-                      <input 
-                        type="text" 
-                        placeholder="开始时间 - 结束时间" 
-                        value={reviewTimeRange}
-                        onChange={(e) => setReviewTimeRange(e.target.value)}
-                        className="bg-transparent border-none outline-none text-[11px] font-medium text-slate-700 w-[140px]"
-                      />
+                    {/* 申请时间 */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-500 font-semibold">申请时间:</span>
+                      <div className="relative flex items-center h-[28px] border border-slate-200 rounded bg-white shadow-xs px-2.5">
+                        <Calendar className="w-3.5 h-3.5 text-slate-400 mr-2 shrink-0" />
+                        <input 
+                          type="text" 
+                          placeholder="开始时间 - 结束时间" 
+                          value={reviewTimeRange}
+                          onChange={(e) => setReviewTimeRange(e.target.value)}
+                          className="bg-transparent border-none outline-none text-[11px] font-medium text-slate-700 w-[140px]"
+                        />
+                      </div>
                     </div>
-                  </div>
 
-                  {/* 搜索 */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-500 font-semibold">关键字:</span>
-                    <div className="relative flex items-center h-[28px] border border-slate-200 rounded bg-white px-2.5">
-                      <Search className="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0" />
-                      <input 
-                        type="text" 
-                        placeholder="检索申请人、科室..." 
-                        value={reviewSearchContent}
-                        onChange={(e) => setReviewSearchContent(e.target.value)}
-                        className="bg-transparent border-none outline-none text-[11px] font-medium text-slate-700 w-[130px]"
-                      />
+                    {/* 搜索 */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-500 font-semibold">关键字:</span>
+                      <div className="relative flex items-center h-[28px] border border-slate-200 rounded bg-white px-2.5">
+                        <Search className="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0" />
+                        <input 
+                          type="text" 
+                          placeholder="检索申请人、科室..." 
+                          value={reviewSearchContent}
+                          onChange={(e) => setReviewSearchContent(e.target.value)}
+                          className="bg-transparent border-none outline-none text-[11px] font-medium text-slate-700 w-[130px]"
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 <div className="flex items-center gap-2">
                   <button 
@@ -1463,29 +1494,80 @@ export const ApprovalCenter = ({ workflows }: ApprovalCenterProps) => {
                 <div className="flex-1 overflow-x-auto min-h-[300px]">
                   <table className="w-full text-left text-[11.5px] border-collapse">
                     <thead className="bg-[#f8fafc] text-slate-700 border-b border-slate-200 font-bold select-none text-[12px]">
-                      <tr>
-                        <th className="py-3 px-4 w-[50px] text-center">序号</th>
-                        <th className="py-3 px-4 w-[115px]">科研库</th>
-                        <th className="py-3 px-4 w-[90px]">来源</th>
-                        <th className="py-3 px-4">数据集名称</th>
-                        <th className="py-3 px-4">数据量</th>
-                        <th className="py-3 px-4">申请科室</th>
-                        <th className="py-3 px-4 w-[80px]">申请人</th>
-                        <th className="py-3 px-4 w-[125px]">申请时间</th>
-                        <th className="py-3 px-4 w-[90px]">审批状态</th>
-                        <th className="py-3 px-4 w-[100px]">当前节点</th>
-                        <th className="py-3 px-4">审批意见</th>
-                        <th className="py-3 px-4 w-[125px]">审批时间</th>
-                        <th className="py-3 px-4 text-center w-[120px]">操作</th>
-                      </tr>
+                      {selectedReviewTab === 'permission' ? (
+                        <tr>
+                          <th className="py-3 px-4 w-[50px] text-center">序号</th>
+                          <th className="py-3 px-4 w-[120px]">数据来源</th>
+                          <th className="py-3 px-4 w-[160px]">申请内容</th>
+                          <th className="py-3 px-4 w-[200px]">申请权限</th>
+                          <th className="py-3 px-4 w-[150px]">申请科室</th>
+                          <th className="py-3 px-4 w-[100px]">申请人</th>
+                          <th className="py-3 px-4 w-[140px]">申请时间</th>
+                          <th className="py-3 px-4 w-[100px]">审批状态</th>
+                          <th className="py-3 px-4">审批意见</th>
+                          <th className="py-3 px-4 w-[140px]">审批时间</th>
+                          <th className="py-3 px-4 text-center w-[120px]">操作</th>
+                        </tr>
+                      ) : (
+                        <tr>
+                          <th className="py-3 px-4 w-[50px] text-center">序号</th>
+                          <th className="py-3 px-4 w-[115px]">科研库</th>
+                          <th className="py-3 px-4 w-[90px]">来源</th>
+                          <th className="py-3 px-4">数据集名称</th>
+                          <th className="py-3 px-4">数据量</th>
+                          <th className="py-3 px-4">申请科室</th>
+                          <th className="py-3 px-4 w-[80px]">申请人</th>
+                          <th className="py-3 px-4 w-[125px]">申请时间</th>
+                          <th className="py-3 px-4 w-[90px]">审批状态</th>
+                          <th className="py-3 px-4 w-[100px]">当前节点</th>
+                          <th className="py-3 px-4">审批意见</th>
+                          <th className="py-3 px-4 w-[125px]">审批时间</th>
+                          <th className="py-3 px-4 text-center w-[120px]">操作</th>
+                        </tr>
+                      )}
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                       {selectedReviewTab === 'permission' ? (
-                        <tr>
-                          <td colSpan={13} className="py-12 text-center text-slate-400 text-xs font-bold bg-white">
-                            暂无权限审批申请
-                          </td>
-                        </tr>
+                        PERMISSION_MOCK_DATA.map((item, index) => (
+                          <tr key={item.id} className="hover:bg-slate-50/50 transition-colors bg-white">
+                            <td className="py-3 px-4 text-center text-slate-500 font-mono">{index + 1}</td>
+                            <td className="py-3 px-4 text-slate-900">{item.dataSource}</td>
+                            <td className="py-3 px-4 text-slate-900">{item.applyContent}</td>
+                            <td className="py-3 px-4">
+                              <div className="flex flex-wrap gap-1.5">
+                                {item.permissions.map((p, i) => (
+                                  <span key={i} className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                                    p === '患者全息视图' ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600'
+                                  }`}>
+                                    {p}
+                                  </span>
+                                ))}
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 text-slate-600">{item.dept}</td>
+                            <td className="py-3 px-4 text-slate-800">{item.applicant}</td>
+                            <td className="py-3 px-4 text-slate-500 font-mono text-[11px]">{item.applyTime}</td>
+                            <td className="py-3 px-4">
+                              {item.status === '审批通过' ? (
+                                <span className="px-2 py-0.5 bg-green-100/60 text-green-600 border border-green-200 rounded text-[11px] font-bold">
+                                  {item.status}
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 bg-orange-100/60 text-orange-600 border border-orange-200 rounded text-[11px] font-bold">
+                                  {item.status}
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 px-4 text-slate-400">{item.opinion}</td>
+                            <td className="py-3 px-4 text-slate-500 font-mono text-[11px]">{item.approveTime}</td>
+                            <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex items-center justify-center gap-3">
+                                <button className="text-blue-600 hover:text-blue-800 cursor-pointer transition-all text-[12px]">审批详情</button>
+                                <button className={`text-blue-600 hover:text-blue-800 cursor-pointer transition-all text-[12px] opacity-40 hover:no-underline cursor-not-allowed text-slate-400`}>审批</button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
                       ) : filteredMyReviews.length === 0 ? (
                         <tr>
                           <td colSpan={13} className="py-12 text-center text-slate-400 text-xs font-bold bg-white">
@@ -1545,7 +1627,7 @@ export const ApprovalCenter = ({ workflows }: ApprovalCenterProps) => {
                 {/* Pagination Footing conforming to Image 2 */}
                 <div className="bg-slate-50 p-3 flex items-center justify-between text-xs text-slate-500 select-none border-t border-slate-200">
                   <div className="flex items-center gap-1.5">
-                    <span>共1页，{selectedReviewTab === 'export' ? filteredMyReviews.length : 0} 条  每页 </span>
+                    <span>共1页，{selectedReviewTab === 'export' ? filteredMyReviews.length : PERMISSION_MOCK_DATA.length} 条  每页 </span>
                     <div className="relative inline-block shrink-0">
                       <select className="appearance-none bg-white border border-slate-200 rounded pl-2.5 pr-6 py-0.5 text-xs text-slate-700 outline-none h-[24px]">
                         <option>50</option>
@@ -1939,71 +2021,7 @@ export const ApprovalCenter = ({ workflows }: ApprovalCenterProps) => {
         )}
       </AnimatePresence>
 
-        {/* CUSTOM FULL-PAGE EXPORT DETAIL VIEW */}
-        {selectedExportDetail && (
-          <motion.div 
-            key="export-detail-view"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            transition={{ duration: 0.15 }}
-            className="flex-grow flex flex-col space-y-4 bg-slate-50/40 p-6 rounded-lg border border-slate-200 relative min-h-[600px] overflow-hidden"
-          >
-             <div className="flex items-center gap-2.5 z-10 select-none">
-              <button 
-                onClick={() => setDetailExportId(null)}
-                className="p-1 rounded text-slate-700 hover:text-slate-900 hover:bg-slate-200/50 transition-colors cursor-pointer"
-              >
-                <ArrowLeft className="w-5 h-5 font-bold" />
-              </button>
-              <h1 className="text-[17px] font-bold text-slate-900 tracking-tight">{selectedExportDetail.datasetName}</h1>
-            </div>
 
-            <div className="bg-white rounded border border-slate-200/80 shadow-sm p-6 flex flex-col flex-grow z-10">
-              {/* Header and top info sections remain largely the same, but structural */}
-              {/* This replaces lines 1640 - 1800 logic. */}
-              
-              <h2 className="font-bold text-lg text-slate-800 mb-6">检索信息</h2>
-              <div className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm border-b border-slate-100 pb-6 mb-6">
-                <div className="flex"><span className="text-slate-500 w-32">数据集名称</span><span className="font-semibold text-slate-900">{selectedExportDetail.datasetName}</span></div>
-                <div className="flex"><span className="text-slate-500 w-32">业务用途</span><span className="font-semibold text-slate-900">测试</span></div>
-                <div className="flex"><span className="text-slate-500 w-32">申请附件</span><span className="text-blue-600 cursor-pointer hover:underline">查看</span></div>
-                <div className="flex"><span className="text-slate-500 w-32">数据量</span><span className="font-semibold text-slate-900">{selectedExportDetail.dataVolume}</span></div>
-                <div className="flex"><span className="text-slate-500 w-32">导出人</span><span className="font-semibold text-slate-900">{selectedExportDetail.applicant}</span></div>
-                <div className="flex"><span className="text-slate-500 w-32">导出时间</span><span className="font-semibold text-slate-900">{selectedExportDetail.approveTime}</span></div>
-                <div className="flex"><span className="text-slate-500 w-32">导出字段</span><span className="text-blue-600 cursor-pointer hover:underline">查看</span></div>
-                <div className="flex"><span className="text-slate-500 w-32">有效状态</span><span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-500" /> {selectedExportDetail.status}</span></div>
-                <div className="flex"><span className="text-slate-500 w-32">失败原因</span><span className="font-semibold text-slate-900">-</span></div>
-              </div>
-
-              <h2 className="font-bold text-lg text-slate-800 mb-4">数据集预览</h2>
-              <div className="border border-slate-200 rounded-lg overflow-hidden text-xs">
-                <div className="overflow-x-auto">
-                      <table className="w-full text-left whitespace-nowrap">
-                        <thead className="bg-slate-50 text-slate-700 border-b border-slate-200">
-                          <tr>
-                            <th className="p-3">rid</th>
-                            <th className="p-3">患者ID</th>
-                            <th className="p-3">就诊ID</th>
-                            <th className="p-3">诊断名称(ICD10)</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 bg-white">
-                          {[1, 2, 3].map((i) => (
-                            <tr key={i}>
-                              <td className="p-3 font-mono">100{i}</td>
-                              <td className="p-3 font-mono">PAT202600{i}</td>
-                              <td className="p-3 font-mono">VIS202699{i}</td>
-                              <td className="p-3">冠状动脉粥样硬化性...</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
 
 
       {/* --- EXPORT ACTION SUBMISSION MODAL --- */}
@@ -2022,63 +2040,99 @@ export const ApprovalCenter = ({ workflows }: ApprovalCenterProps) => {
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-lg shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden select-none relative z-10 flex flex-col"
+              className="bg-white rounded-md shadow-2xl border border-slate-200 w-full max-w-[600px] overflow-hidden select-none relative z-10 flex flex-col"
             >
-              <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                <div className="flex items-center gap-2 text-slate-800">
-                  <ClipboardCheck className="w-4 h-4 text-blue-600" />
-                  <h3 className="font-bold text-sm">科研文件导出快速审批</h3>
-                </div>
+              {/* Header */}
+              <div className="px-6 py-4 flex items-center justify-between relative overflow-hidden">
+                 {/* Subtle faint background pattern to match Image 1's airy header feel */}
+                 <div className="absolute inset-0 opacity-20 pointer-events-none bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-200 via-transparent to-transparent" />
+                <h3 className="font-bold text-[17px] text-slate-800 relative z-10">审批</h3>
                 <button 
                   onClick={() => setShowApprovalActionModal(null)}
-                  className="p-1 rounded-full hover:bg-slate-200 transition-colors text-slate-400 hover:text-slate-600 cursor-pointer"
+                  className="p-1 text-slate-500 hover:text-slate-800 transition-colors relative z-10 cursor-pointer"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <div className="p-5 space-y-4 text-xs">
-                <div className="bg-blue-50/50 p-3 rounded-md border border-blue-100 space-y-1.5">
-                  <p className="text-[11px] text-slate-500 font-semibold">待审数据集及申请信息</p>
-                  <div className="grid grid-cols-2 gap-y-1.5 text-[11.5px] font-medium text-slate-700 col-span-2">
-                    <div><span className="text-slate-400 font-normal">申请人：</span>{showApprovalActionModal.applicant}</div>
-                    <div><span className="text-slate-400 font-normal">来源于：</span>{showApprovalActionModal.source}</div>
-                    <div className="col-span-2"><span className="text-slate-400 font-normal">科研库：</span>{showApprovalActionModal.dbName}</div>
-                    <div className="col-span-2"><span className="text-slate-400 font-normal">数据量：</span>{showApprovalActionModal.dataVolume}</div>
+              {/* Body */}
+              <div className="px-10 py-6 space-y-7">
+                
+                {/* Result */}
+                <div className="flex text-[14px]">
+                  <div className="w-[100px] text-slate-600 flex-shrink-0 pt-0.5 whitespace-nowrap">审批结果</div>
+                  <div className="flex items-center gap-8">
+                    <label className="flex items-center gap-2 cursor-pointer group">
+                      <input 
+                        type="radio" 
+                        name="approvalResult" 
+                        value="审批通过"
+                        checked={approvalResult === '审批通过'}
+                        onChange={() => setApprovalResult('审批通过')}
+                        className="hidden"
+                      />
+                      <div className={`w-[18px] h-[18px] rounded-full border-[1.5px] flex items-center justify-center transition-colors ${approvalResult === '审批通过' ? 'border-[#1b5dfc]' : 'border-slate-300 group-hover:border-slate-400'}`}>
+                        {approvalResult === '审批通过' && <div className="w-[10px] h-[10px] rounded-full bg-[#1b5dfc]" />}
+                      </div>
+                      <span className="text-slate-700">审批通过</span>
+                    </label>
+                    
+                    <label className="flex items-center gap-2 cursor-pointer group">
+                      <input 
+                        type="radio" 
+                        name="approvalResult" 
+                        value="审批拒绝"
+                        checked={approvalResult === '审批拒绝'}
+                        onChange={() => setApprovalResult('审批拒绝')}
+                        className="hidden"
+                      />
+                      <div className={`w-[18px] h-[18px] rounded-full border-[1.5px] flex items-center justify-center transition-colors ${approvalResult === '审批拒绝' ? 'border-[#1b5dfc]' : 'border-slate-300 group-hover:border-slate-400'}`}>
+                         {approvalResult === '审批拒绝' && <div className="w-[10px] h-[10px] rounded-full bg-[#1b5dfc]" />}
+                      </div>
+                      <span className="text-slate-700">审批拒绝</span>
+                    </label>
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-                    审批意见 / 反馈说明:
-                  </label>
-                  <textarea
-                    rows={3}
-                    placeholder="请输入审批评语（如：符合出库合规标准，予以放行）"
-                    value={approvalActionComment}
-                    onChange={(e) => setApprovalActionComment(e.target.value)}
-                    className="w-full border border-slate-250 rounded p-2.5 text-xs outline-none focus:border-blue-600 font-medium text-slate-800 focus:ring-1 focus:ring-blue-100 placeholder:text-slate-350"
-                  />
+                {/* Comment */}
+                <div className="flex text-[14px]">
+                  <div className="w-[100px] text-slate-600 flex-shrink-0 pt-2 whitespace-nowrap">审批意见</div>
+                  <div className="flex-1 relative">
+                    <textarea
+                      rows={5}
+                      placeholder="请输入"
+                      value={approvalActionComment}
+                      maxLength={500}
+                      onChange={(e) => setApprovalActionComment(e.target.value)}
+                      className="w-full border border-slate-200 rounded text-[14px] p-3 outline-none focus:border-blue-400 transition-colors text-slate-700 placeholder:text-slate-400 resize-none shadow-sm"
+                    />
+                    <div className="absolute bottom-3 right-3 text-[12px] text-slate-400">
+                      {approvalActionComment.length} / 500
+                    </div>
+                  </div>
                 </div>
+
               </div>
 
-              <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
+              {/* Bottom Buttons */}
+              <div className="pb-8 pt-2 flex items-center justify-center gap-4">
                 <button 
                   onClick={() => setShowApprovalActionModal(null)}
-                  className="px-3.5 py-1.5 bg-white border border-slate-200 rounded text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                  className="w-[100px] py-1.5 bg-white border border-slate-200 rounded-[2px] text-[14px] text-slate-700 hover:bg-slate-50 hover:text-slate-900 cursor-pointer transition-colors shadow-sm"
                 >
                   取消
                 </button>
                 <button 
                   onClick={() => {
-                    const comment = approvalActionComment.trim() || '不符合合规标准，已被驳回';
+                    const comment = approvalActionComment.trim() || (approvalResult === '审批通过' ? '审批通过' : '审批拒绝');
                     const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
+                    const isApproved = approvalResult === '审批通过';
                     
                     const updated = myReviewList.map(item => {
                       if (item.id === showApprovalActionModal.id) {
                         return {
                           ...item,
-                          status: '已驳回',
+                          status: isApproved ? '审批通过' : '已驳回',
                           opinion: comment,
                           approveTime: timestamp
                         };
@@ -2089,37 +2143,11 @@ export const ApprovalCenter = ({ workflows }: ApprovalCenterProps) => {
                     setShowApprovalActionModal(null);
                     setDetailItem(null);
                     setCurrentView('my-approvals');
-                    triggerToast(`申请【数据集:${showApprovalActionModal.datasetName}】已被成功驳回`);
+                    triggerToast(`已${isApproved ? '同意' : '驳回'}申请【数据集:${showApprovalActionModal.datasetName}】`);
                   }}
-                  className="px-3.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded text-xs font-semibold cursor-pointer"
+                  className="w-[100px] py-1.5 bg-[#1b5dfc] hover:bg-blue-700 text-white rounded-[2px] text-[14px] cursor-pointer transition-colors shadow-sm"
                 >
-                  驳回申请
-                </button>
-                <button 
-                  onClick={() => {
-                    const comment = approvalActionComment.trim() || '符合出库合规标准，同意导出本数据集';
-                    const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
-
-                    const updated = myReviewList.map(item => {
-                      if (item.id === showApprovalActionModal.id) {
-                        return {
-                          ...item,
-                          status: '审批通过',
-                          opinion: comment,
-                          approveTime: timestamp
-                        };
-                      }
-                      return item;
-                    });
-                    setMyReviewList(updated);
-                    setShowApprovalActionModal(null);
-                    setDetailItem(null);
-                    setCurrentView('my-approvals');
-                    triggerToast(`已经同意通过申请并赋权【数据集:${showApprovalActionModal.datasetName}】`);
-                  }}
-                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold cursor-pointer"
-                >
-                  同意并通过
+                  确定
                 </button>
               </div>
             </motion.div>
