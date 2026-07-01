@@ -160,6 +160,21 @@ export function WorkflowDesigner({ workflow, onSave, onClose, onDelete, onRefere
     return subConfigsStr.split(',').map((s: string) => s.trim()).filter(Boolean);
   });
   
+  const [scenesDropdownOpen, setScenesDropdownOpen] = useState(false);
+  const scenesDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (scenesDropdownRef.current && !scenesDropdownRef.current.contains(event.target as Node)) {
+        setScenesDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+  
   // Custom states matching screenshot
   const [description, setDescription] = useState('');
   const [visible, setVisible] = useState(workflow.visible !== false);
@@ -856,6 +871,81 @@ export function WorkflowDesigner({ workflow, onSave, onClose, onDelete, onRefere
                         <option value="权限审批">权限审批</option>
                       </select>
                       <ChevronDown className="w-4 h-4 text-slate-400 absolute left-[295px] top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 导出场景 */}
+                <div className="flex text-[14px]">
+                  <div className="w-[120px] pt-2 text-slate-700 font-semibold flex-shrink-0">
+                    导出场景
+                  </div>
+                  <div className="flex-1">
+                    <div className="relative w-[320px]" ref={scenesDropdownRef}>
+                      <div
+                        onClick={() => setScenesDropdownOpen(!scenesDropdownOpen)}
+                        className="w-full min-h-[40px] px-3 py-1.5 border border-slate-200 rounded text-slate-800 bg-white cursor-pointer hover:border-slate-300 focus-within:border-blue-500 transition-colors flex flex-wrap items-center gap-1.5 pr-8 select-none"
+                      >
+                        {selectedSubConfigs.length === 0 ? (
+                          <span className="text-slate-400 text-xs">请选择导出场景</span>
+                        ) : (
+                          selectedSubConfigs.map((scene) => (
+                            <span
+                              key={scene}
+                              className="inline-flex items-center gap-1 bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md text-xs font-bold border border-blue-100"
+                            >
+                              <span>{scene}</span>
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedSubConfigs(prev => prev.filter(item => item !== scene));
+                                }}
+                                className="w-3.5 h-3.5 rounded-full hover:bg-blue-100 flex items-center justify-center text-blue-500 hover:text-blue-700 cursor-pointer font-bold text-[10px]"
+                              >
+                                ✕
+                              </span>
+                            </span>
+                          ))
+                        )}
+                        <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </div>
+
+                      {/* Dropdown Options */}
+                      <AnimatePresence>
+                        {scenesDropdownOpen && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -4 }}
+                            transition={{ duration: 0.15 }}
+                            className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 overflow-hidden py-1"
+                          >
+                            {['数据中心', '数据检索', '患者收藏', '课题'].map((scene) => {
+                              const isSelected = selectedSubConfigs.includes(scene);
+                              return (
+                                <div
+                                  key={scene}
+                                  onClick={() => {
+                                    if (isSelected) {
+                                      setSelectedSubConfigs(prev => prev.filter(item => item !== scene));
+                                    } else {
+                                      setSelectedSubConfigs(prev => [...prev, scene]);
+                                    }
+                                  }}
+                                  className="px-4 py-2 hover:bg-slate-50 cursor-pointer flex items-center justify-between text-xs text-slate-750 select-none animate-fade-in"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors ${isSelected ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300 bg-white'}`}>
+                                      {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                                    </div>
+                                    <span className={isSelected ? 'font-bold text-slate-900' : 'text-slate-750'}>{scene}</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
                   </div>
                 </div>
