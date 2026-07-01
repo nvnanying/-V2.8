@@ -32,7 +32,8 @@ import {
   HelpCircle,
   Info,
   Sliders,
-  Calendar
+  Calendar,
+  Copy
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -703,15 +704,6 @@ export function WorkflowDesigner({ workflow, onSave, onClose, onDelete, onRefere
                 删除
               </button>
             )}
-            {onReference && (
-              <button
-                type="button"
-                onClick={onReference}
-                className="px-4 py-2 bg-white hover:bg-blue-50 text-blue-600 border border-blue-500 rounded-lg text-xs font-bold transition-all cursor-pointer"
-              >
-                引用其他库配置
-              </button>
-            )}
             <button
               type="button"
               onClick={() => {
@@ -1112,31 +1104,43 @@ export function WorkflowDesigner({ workflow, onSave, onClose, onDelete, onRefere
         <div className="w-full h-full relative">
           
           {/* Top Right Tool Bar */}
-          <div className="absolute right-6 top-6 bg-white border border-slate-200 shadow-[0_2px_12px_rgba(0,0,0,0.06)] rounded flex items-center z-30">
-            <button onClick={() => { setZoom(1); setPanOffset({ x: -100, y: -40 }); }} className="w-8 h-8 flex items-center justify-center border-r border-slate-100 hover:bg-slate-50 transition-colors" title="适应屏幕">
-              <Maximize2 className="w-3.5 h-3.5 text-slate-600" />
-            </button>
-            <button onClick={() => setZoom(z => Math.min(1.5, z + 0.1))} className="w-8 h-8 flex items-center justify-center border-r border-slate-100 hover:bg-slate-50 transition-colors" title="放大">
-              <span className="text-slate-600 font-bold leading-none">+</span>
-            </button>
-            <button onClick={() => setZoom(z => Math.max(0.6, z - 0.1))} className="w-8 h-8 flex items-center justify-center border-r border-slate-100 hover:bg-slate-50 transition-colors" title="缩小">
-              <span className="text-slate-600 font-bold leading-none">-</span>
-            </button>
-            <button onClick={handleUndo} className="w-8 h-8 flex items-center justify-center border-r border-slate-100 hover:bg-slate-50 transition-colors" title="撤销">
-              <span className="text-slate-600 font-bold">«</span>
-            </button>
-            <button onClick={handleRedo} className="w-8 h-8 flex items-center justify-center border-r border-slate-100 hover:bg-slate-50 transition-colors" title="重做">
-              <span className="text-slate-600 font-bold">»</span>
-            </button>
-            <button onClick={() => { if(selectedNodeId) handleDeleteNode(selectedNodeId, {stopPropagation:()=>{}} as any) }} className="w-8 h-8 flex items-center justify-center border-r border-slate-100 hover:bg-slate-50 text-red-500 transition-colors" title="删除">
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-            <button onClick={() => showToast('已保存为图片')} className="w-8 h-8 flex items-center justify-center border-r border-slate-100 hover:bg-slate-50 transition-colors" title="保存图片">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-600"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-            </button>
-            <button onClick={handleDownloadFile} className="w-8 h-8 flex items-center justify-center hover:bg-slate-50 transition-colors" title="下载">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-600"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-            </button>
+          <div className="absolute right-6 top-6 flex items-center gap-3.5 z-30 select-none">
+            {onReference && (
+              <button
+                type="button"
+                onClick={onReference}
+                className="h-8 px-4 bg-white hover:bg-blue-50 text-blue-600 border border-blue-500 rounded-lg text-xs font-extrabold shadow-sm hover:shadow transition-all flex items-center gap-1.5 cursor-pointer select-none"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span>引用其他库配置</span>
+              </button>
+            )}
+            <div className="bg-white border border-slate-200 shadow-[0_2px_12px_rgba(0,0,0,0.06)] rounded flex items-center">
+              <button onClick={() => { setZoom(1); setPanOffset({ x: -100, y: -40 }); }} className="w-8 h-8 flex items-center justify-center border-r border-slate-100 hover:bg-slate-50 transition-colors" title="适应屏幕">
+                <Maximize2 className="w-3.5 h-3.5 text-slate-600" />
+              </button>
+              <button onClick={() => setZoom(z => Math.min(1.5, z + 0.1))} className="w-8 h-8 flex items-center justify-center border-r border-slate-100 hover:bg-slate-50 transition-colors" title="放大">
+                <span className="text-slate-600 font-bold leading-none">+</span>
+              </button>
+              <button onClick={() => setZoom(z => Math.max(0.6, z - 0.1))} className="w-8 h-8 flex items-center justify-center border-r border-slate-100 hover:bg-slate-50 transition-colors" title="缩小">
+                <span className="text-slate-600 font-bold leading-none">-</span>
+              </button>
+              <button onClick={handleUndo} className="w-8 h-8 flex items-center justify-center border-r border-slate-100 hover:bg-slate-50 transition-colors" title="撤销">
+                <span className="text-slate-600 font-bold">«</span>
+              </button>
+              <button onClick={handleRedo} className="w-8 h-8 flex items-center justify-center border-r border-slate-100 hover:bg-slate-50 transition-colors" title="重做">
+                <span className="text-slate-600 font-bold">»</span>
+              </button>
+              <button onClick={() => { if(selectedNodeId) handleDeleteNode(selectedNodeId, {stopPropagation:()=>{}} as any) }} className="w-8 h-8 flex items-center justify-center border-r border-slate-100 hover:bg-slate-50 text-red-500 transition-colors" title="删除">
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+              <button onClick={() => showToast('已保存为图片')} className="w-8 h-8 flex items-center justify-center border-r border-slate-100 hover:bg-slate-50 transition-colors" title="保存图片">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-600"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+              </button>
+              <button onClick={handleDownloadFile} className="w-8 h-8 flex items-center justify-center hover:bg-slate-50 transition-colors" title="下载">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-600"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              </button>
+            </div>
           </div>
 
           {/* Interactive designer Canvas Paper */}

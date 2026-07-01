@@ -206,13 +206,13 @@ export const DatabaseSourceManager = () => {
   }>>([
     {
       id: 'wf-1',
-      name: '基础调阅合规审批流',
+      name: '未命名工作流1',
       version: 'V1',
       modules: ['数据中心', '数据检索'],
       workflow: {
         id: 'wf_flow_1',
         category: '数据导出',
-        name: '基础调阅合规审批流',
+        name: '未命名工作流1',
         visible: true,
         visibleRange: '全员',
         formName: '通用科研库',
@@ -222,13 +222,13 @@ export const DatabaseSourceManager = () => {
     },
     {
       id: 'wf-2',
-      name: '科研课题安全脱敏流',
+      name: '未命名工作流2',
       version: 'V2',
       modules: ['患者收藏', '课题'],
       workflow: {
         id: 'wf_flow_2',
         category: '数据导出',
-        name: '科研课题安全脱敏流',
+        name: '未命名工作流2',
         visible: true,
         visibleRange: '全员',
         formName: '通用科研库',
@@ -251,13 +251,13 @@ export const DatabaseSourceManager = () => {
     return [
       {
         id: 'wf-1',
-        name: '基础调阅合规审批流',
+        name: '未命名工作流1',
         version: 'V1',
         modules: ['数据中心', '数据检索'],
         workflow: {
           id: 'wf_flow_1',
           category: '数据导出',
-          name: '基础调阅合规审批流',
+          name: '未命名工作流1',
           visible: true,
           visibleRange: '全员',
           formName: db.name,
@@ -267,13 +267,13 @@ export const DatabaseSourceManager = () => {
       },
       {
         id: 'wf-2',
-        name: '科研课题安全脱敏流',
+        name: '未命名工作流2',
         version: 'V2',
         modules: ['患者收藏', '课题'],
         workflow: {
           id: 'wf_flow_2',
           category: '数据导出',
-          name: '科研课题安全脱敏流',
+          name: '未命名工作流2',
           visible: true,
           visibleRange: '全员',
           formName: db.name,
@@ -466,13 +466,13 @@ export const DatabaseSourceManager = () => {
       const defaultWorkflows = [
         {
           id: 'wf-1',
-          name: '基础调阅合规审批流',
+          name: '未命名工作流1',
           version: 'V1',
           modules: ['数据中心', '数据检索'],
           workflow: {
             id: 'wf_flow_1',
             category: '数据导出',
-            name: '基础调阅合规审批流',
+            name: '未命名工作流1',
             visible: true,
             visibleRange: '全员',
             formName: db.name || '通用科研库',
@@ -482,13 +482,13 @@ export const DatabaseSourceManager = () => {
         },
         {
           id: 'wf-2',
-          name: '科研课题安全脱敏流',
+          name: '未命名工作流2',
           version: 'V2',
           modules: ['患者收藏', '课题'],
           workflow: {
             id: 'wf_flow_2',
             category: '数据导出',
-            name: '科研课题安全脱敏流',
+            name: '未命名工作流2',
             visible: true,
             visibleRange: '全员',
             formName: db.name || '通用科研库',
@@ -630,12 +630,12 @@ export const DatabaseSourceManager = () => {
                     })}
                   </div>
 
-                  {/* "+ 自定义数据导出审批流" dashed button card */}
+                  {/* "+ 新增工作流" dashed button card */}
                   <div
                     onClick={() => {
                       const newId = `flow_${Date.now()}`;
                       const newIndex = customWorkflows.length + 1;
-                      const newName = `自定义数据导出审批流 #${newIndex}`;
+                      const newName = `未命名工作流${newIndex}`;
                       const newFlowObj = {
                         id: newId,
                         name: newName,
@@ -672,7 +672,7 @@ export const DatabaseSourceManager = () => {
                     className="border border-dashed border-blue-500 hover:border-blue-600 bg-white hover:bg-blue-50/20 rounded-xl flex items-center justify-center p-4 gap-2 text-center cursor-pointer transition-all shadow-sm text-blue-600 font-bold text-xs"
                   >
                     <span className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-sm font-bold">+</span>
-                    <span>自定义数据导出审批流</span>
+                    <span>新增工作流</span>
                   </div>
                 </div>
 
