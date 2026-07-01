@@ -19,7 +19,9 @@ import {
   Biohazard,
   Check,
   Download,
-  Copy
+  Copy,
+  ChevronDown,
+  Link
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { WorkflowDesigner, WorkflowItem } from './WorkflowDesigner';
@@ -1140,67 +1142,80 @@ export const DatabaseSourceManager = () => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowReferenceModal(false)}
-              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]"
             />
 
             <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }}
+              initial={{ scale: 0.96, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden relative z-[101] flex flex-col max-h-[90vh]"
+              exit={{ scale: 0.96, opacity: 0 }}
+              className="bg-white rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.12)] border border-slate-100 w-full max-w-[460px] overflow-hidden relative z-[101] flex flex-col max-h-[90vh]"
             >
-              {/* Header */}
-              <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50 select-none">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
-                    <Copy className="w-4 h-4" />
+              {/* Header with stylish connection/link graphic mockup from screenshot */}
+              <div className="p-6 relative overflow-hidden flex items-center justify-between select-none shrink-0 bg-gradient-to-r from-slate-50 via-white to-blue-50/10">
+                <div className="flex flex-col">
+                  <h3 className="font-extrabold text-slate-800 text-lg tracking-tight">引用其他科研库工作流配置</h3>
+                </div>
+                
+                {/* Visual design element inspired by the screenshot banner */}
+                <div className="absolute right-14 top-2 pointer-events-none opacity-90 flex items-center gap-1.5 select-none">
+                  {/* Green circle with white/light green link */}
+                  <div className="w-8 h-8 rounded-full bg-[#10b981]/10 border border-[#10b981]/20 flex items-center justify-center text-[#10b981]">
+                    <Link className="w-3.5 h-3.5 rotate-45" />
                   </div>
-                  <div>
-                    <h3 className="font-extrabold text-slate-800 text-sm">引用其他科研库工作流配置</h3>
-                    <p className="text-[10px] text-slate-400 font-medium">快速导入已有科研库配置成熟的审批流方案</p>
+                  {/* Miniature window interface mockup */}
+                  <div className="w-16 h-10 rounded-lg bg-slate-50 border border-slate-150 p-1 flex flex-col gap-0.5 shadow-sm">
+                    <div className="w-8 h-1 bg-blue-500 rounded-full" />
+                    <div className="w-5 h-0.5 bg-slate-200 rounded-full" />
+                    <div className="w-12 h-3.5 bg-white border border-slate-100 rounded-[2px] flex items-center justify-center text-[4px] text-slate-400 font-bold scale-90">
+                      Workflow
+                    </div>
                   </div>
                 </div>
+
                 <button 
                   onClick={() => setShowReferenceModal(false)}
-                  className="p-1 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-600 cursor-pointer border-0 bg-transparent transition-colors"
+                  className="p-1 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer border-0 bg-transparent transition-colors z-10"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
               {/* Body */}
-              <div className="p-6 overflow-y-auto space-y-5 flex-1 text-xs text-slate-700">
+              <div className="px-6 py-4 overflow-y-auto space-y-6 flex-1">
                 {/* 1. Target Database Selection */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
-                    选择源科研数据库*
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700 flex items-center select-none">
+                    <span className="text-red-500 font-bold mr-1">*</span>选择源科研数据库
                   </label>
-                  <select
-                    value={referenceSourceDbId}
-                    onChange={(e) => handleSourceDatabaseChange(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 font-bold outline-none focus:border-blue-500 focus:bg-white transition-all cursor-pointer"
-                  >
-                    <option value="" disabled>-- 请选择作为引用源的科研库 --</option>
-                    {databases
-                      .filter(d => d.id !== exportingDb.id)
-                      .map(d => {
-                        const count = getWorkflowsForDatabase(d).length;
-                        return (
+                  <div className="relative">
+                    <select
+                      value={referenceSourceDbId}
+                      onChange={(e) => handleSourceDatabaseChange(e.target.value)}
+                      className="w-full bg-white border border-slate-200 hover:border-slate-300 rounded-xl px-4 py-3 text-xs text-slate-800 font-bold outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 transition-all cursor-pointer appearance-none pr-10 shadow-sm"
+                    >
+                      <option value="" disabled>-- 请选择 --</option>
+                      {databases
+                        .filter(d => d.id !== exportingDb.id)
+                        .map(d => (
                           <option key={d.id} value={d.id}>
-                            {d.name} ({count}个工作流)
+                            {d.name}
                           </option>
-                        );
-                      })}
-                  </select>
+                        ))}
+                    </select>
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                      <ChevronDown className="w-4 h-4" />
+                    </div>
+                  </div>
                 </div>
 
                 {/* 2. Workflows checklist of chosen database */}
                 {referenceSourceDbId && (
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
-                      选择要引用的工作流* (可多选)
+                    <label className="text-xs font-bold text-slate-700 flex items-center select-none">
+                      <span className="text-red-500 font-bold mr-1">*</span>选择要引用的工作流
                     </label>
-                    <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/30 max-h-48 overflow-y-auto divide-y divide-slate-100">
+                    <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1 custom-scrollbar">
                       {getWorkflowsForDatabase(databases.find(d => d.id === referenceSourceDbId)!).map((wf) => {
                         const isChecked = referenceWorkflowIds.includes(wf.id);
                         return (
@@ -1213,26 +1228,24 @@ export const DatabaseSourceManager = () => {
                                 setReferenceWorkflowIds(prev => [...prev, wf.id]);
                               }
                             }}
-                            className="flex items-start gap-3 p-3 hover:bg-slate-50 cursor-pointer select-none transition-all"
+                            className={`p-4 border rounded-xl cursor-pointer transition-all select-none flex flex-col gap-2 bg-white ${
+                              isChecked
+                                ? 'border-blue-500 shadow-[0_2px_12px_rgba(59,130,246,0.04)]'
+                                : 'border-slate-200 hover:border-slate-300'
+                            }`}
                           >
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => {}} // handled by parent onClick
-                              className="mt-0.5 rounded text-blue-600 focus:ring-blue-500"
-                            />
-                            <div className="space-y-1 pl-1">
-                              <span className="font-bold text-slate-800 text-xs block">{wf.name}</span>
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {wf.modules.map(mod => (
-                                  <span key={mod} className="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold">
-                                    {mod}
-                                  </span>
-                                ))}
-                                {wf.modules.length === 0 && (
-                                  <span className="text-[9px] text-slate-400 font-medium">未绑定任何模块</span>
-                                )}
-                              </div>
+                            <div className="flex items-center justify-between">
+                              <span className="font-extrabold text-slate-800 text-[13px] tracking-wide">{wf.name}</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5 mt-0.5">
+                              {wf.modules.map(mod => (
+                                <span key={mod} className="text-[11px] bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded font-bold">
+                                  {mod}
+                                </span>
+                              ))}
+                              {wf.modules.length === 0 && (
+                                <span className="text-[11px] text-slate-400 font-medium">未绑定任何模块</span>
+                              )}
                             </div>
                           </div>
                         );
@@ -1240,70 +1253,22 @@ export const DatabaseSourceManager = () => {
                     </div>
                   </div>
                 )}
-
-                {/* 3. Reference mode choosing */}
-                <div className="space-y-2.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
-                    选择导入模式*
-                  </label>
-                  <div className="grid grid-cols-2 gap-3.5">
-                    {/* Append */}
-                    <div
-                      onClick={() => setReferenceMode('append')}
-                      className={`flex flex-col p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                        referenceMode === 'append'
-                          ? 'border-blue-600 bg-blue-50/10'
-                          : 'border-slate-200 hover:border-slate-300 bg-white'
-                      }`}
-                    >
-                      <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5 mb-1 select-none">
-                        <span className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${referenceMode === 'append' ? 'border-blue-600' : 'border-slate-300'}`}>
-                          {referenceMode === 'append' && <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />}
-                        </span>
-                        <span>追加并共存</span>
-                      </span>
-                      <span className="text-[10px] text-slate-400 leading-normal pl-5 font-medium">
-                        复制选中审批流并新增至本库，保留当前已设计的全部内容。
-                      </span>
-                    </div>
-
-                    {/* Overwrite */}
-                    <div
-                      onClick={() => setReferenceMode('overwrite')}
-                      className={`flex flex-col p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                        referenceMode === 'overwrite'
-                          ? 'border-red-600 bg-red-50/5'
-                          : 'border-slate-200 hover:border-slate-300 bg-white'
-                      }`}
-                    >
-                      <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5 mb-1 select-none">
-                        <span className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${referenceMode === 'overwrite' ? 'border-red-600' : 'border-slate-300'}`}>
-                          {referenceMode === 'overwrite' && <span className="w-1.5 h-1.5 rounded-full bg-red-600" />}
-                        </span>
-                        <span>覆盖当前配置</span>
-                      </span>
-                      <span className="text-[10px] text-slate-400 leading-normal pl-5 font-medium">
-                        清空当前本库的工作流，完全以选中的目标工作流进行替代。
-                      </span>
-                    </div>
-                  </div>
-                </div>
               </div>
 
               {/* Footer */}
-              <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3 shrink-0">
+              <div className="p-6 pt-2 pb-6 flex items-center justify-center gap-4 select-none shrink-0 bg-white">
                 <button
                   type="button"
                   onClick={() => setShowReferenceModal(false)}
-                  className="px-4.5 py-2 bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                  className="px-10 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-sm"
                 >
-                  取消
+                  取 消
                 </button>
                 <button
                   type="button"
                   onClick={handleConfirmReference}
                   disabled={!referenceSourceDbId || referenceWorkflowIds.length === 0}
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer border-0"
+                  className="px-8 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold shadow-sm transition-all cursor-pointer border-0"
                 >
                   确认导入配置
                 </button>
