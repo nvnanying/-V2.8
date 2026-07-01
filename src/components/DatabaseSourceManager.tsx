@@ -18,7 +18,8 @@ import {
   AlertCircle, 
   Biohazard,
   Check,
-  Download
+  Download,
+  Copy
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { WorkflowDesigner, WorkflowItem } from './WorkflowDesigner';
@@ -33,6 +34,16 @@ interface DatabaseSource {
   patientsCount: number;
   recordsCount: number;
   isCustomIcon?: boolean; // For JH传染病 custom sparkles
+  exportApproval?: boolean;
+  approvalType?: 'oa' | 'platform';
+  selectedWorkflowId?: string;
+  customWorkflows?: Array<{
+    id: string;
+    name: string;
+    version: string;
+    modules: string[];
+    workflow: WorkflowItem;
+  }>;
 }
 
 const INITIAL_DATABASES: DatabaseSource[] = [
@@ -227,6 +238,129 @@ export const DatabaseSourceManager = () => {
 
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>('wf-1');
 
+  // States for importing/referencing workflow configs from other databases
+  const [showReferenceModal, setShowReferenceModal] = useState(false);
+  const [referenceSourceDbId, setReferenceSourceDbId] = useState<string>('');
+  const [referenceWorkflowIds, setReferenceWorkflowIds] = useState<string[]>([]);
+  const [referenceMode, setReferenceMode] = useState<'append' | 'overwrite'>('append');
+
+  const getWorkflowsForDatabase = (db: DatabaseSource) => {
+    if (db.customWorkflows) return db.customWorkflows;
+    return [
+      {
+        id: 'wf-1',
+        name: '基础调阅合规审批流',
+        version: 'V1',
+        modules: ['数据中心', '数据检索'],
+        workflow: {
+          id: 'wf_flow_1',
+          category: '数据导出',
+          name: '基础调阅合规审批流',
+          visible: true,
+          visibleRange: '全员',
+          formName: db.name,
+          lastPublish: '2026-05-21',
+          version: 'V1'
+        }
+      },
+      {
+        id: 'wf-2',
+        name: '科研课题安全脱敏流',
+        version: 'V2',
+        modules: ['患者收藏', '课题'],
+        workflow: {
+          id: 'wf_flow_2',
+          category: '数据导出',
+          name: '科研课题安全脱敏流',
+          visible: true,
+          visibleRange: '全员',
+          formName: db.name,
+          lastPublish: '2026-05-21',
+          version: 'V2'
+        }
+      }
+    ];
+  };
+
+  const handleOpenReferenceModal = () => {
+    const others = databases.filter(d => d.id !== exportingDb?.id);
+    if (others.length === 0) {
+      triggerToast('暂无可引用的其他科研库（当前仅有1个科研库）');
+      return;
+    }
+    const targetDb = others[0];
+    setReferenceSourceDbId(targetDb.id);
+    const targetWorkflows = getWorkflowsForDatabase(targetDb);
+    setReferenceWorkflowIds(targetWorkflows.map(w => w.id));
+    setReferenceMode('append');
+    setShowReferenceModal(true);
+  };
+
+  const handleSourceDatabaseChange = (dbId: string) => {
+    setReferenceSourceDbId(dbId);
+    const targetDb = databases.find(d => d.id === dbId);
+    if (targetDb) {
+      const targetWorkflows = getWorkflowsForDatabase(targetDb);
+      setReferenceWorkflowIds(targetWorkflows.map(w => w.id));
+    }
+  };
+
+  const handleConfirmReference = () => {
+    if (!exportingDb) return;
+    const sourceDb = databases.find(d => d.id === referenceSourceDbId);
+    if (!sourceDb) {
+      triggerToast('选择的源科研库不存在！');
+      return;
+    }
+    
+    const sourceWorkflows = getWorkflowsForDatabase(sourceDb);
+    const selectedSourceFlows = sourceWorkflows.filter(w => referenceWorkflowIds.includes(w.id));
+    
+    if (selectedSourceFlows.length === 0) {
+      triggerToast('请至少选择一个要引用的工作流！');
+      return;
+    }
+    
+    const clonedFlows = selectedSourceFlows.map((flow, idx) => {
+      const newId = `flow_cloned_${Date.now()}_${idx}`;
+      return {
+        ...flow,
+        id: newId,
+        name: `${flow.name} (自-${sourceDb.name})`,
+        workflow: {
+          ...flow.workflow,
+          id: `wf_${newId}`,
+          name: `${flow.workflow.name} (来自${sourceDb.name})`,
+          formName: exportingDb.name
+        }
+      };
+    });
+    
+    let nextFlows = [];
+    if (referenceMode === 'append') {
+      nextFlows = [...customWorkflows, ...clonedFlows];
+    } else {
+      nextFlows = clonedFlows;
+    }
+    
+    setCustomWorkflows(nextFlows);
+    setSelectedWorkflowId(clonedFlows[0].id);
+    
+    setDatabases(prev => prev.map(d => {
+      if (d.id === exportingDb.id) {
+        return {
+          ...d,
+          customWorkflows: nextFlows,
+          selectedWorkflowId: clonedFlows[0].id
+        };
+      }
+      return d;
+    }));
+    
+    setShowReferenceModal(false);
+    triggerToast(`成功引用自【${sourceDb.name}】的 ${clonedFlows.length} 个工作流，并已独立保存！`);
+  };
+
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
@@ -319,9 +453,51 @@ export const DatabaseSourceManager = () => {
 
   const handleExportDbConfig = (db: DatabaseSource) => {
     setExportingDb(db);
-    setExportApproval(true);
-    setApprovalType('platform');
-    setSelectedWorkflowId('wf-1');
+    setExportApproval(db.exportApproval !== undefined ? db.exportApproval : true);
+    setApprovalType(db.approvalType || 'platform');
+    
+    if (db.customWorkflows) {
+      setCustomWorkflows(db.customWorkflows);
+      setSelectedWorkflowId(db.selectedWorkflowId || db.customWorkflows[0]?.id || 'wf-1');
+    } else {
+      // Create a fresh default set for this db so they don't share reference or get reset
+      const defaultWorkflows = [
+        {
+          id: 'wf-1',
+          name: '基础调阅合规审批流',
+          version: 'V1',
+          modules: ['数据中心', '数据检索'],
+          workflow: {
+            id: 'wf_flow_1',
+            category: '数据导出',
+            name: '基础调阅合规审批流',
+            visible: true,
+            visibleRange: '全员',
+            formName: db.name || '通用科研库',
+            lastPublish: '2026-05-21',
+            version: 'V1'
+          }
+        },
+        {
+          id: 'wf-2',
+          name: '科研课题安全脱敏流',
+          version: 'V2',
+          modules: ['患者收藏', '课题'],
+          workflow: {
+            id: 'wf_flow_2',
+            category: '数据导出',
+            name: '科研课题安全脱敏流',
+            visible: true,
+            visibleRange: '全员',
+            formName: db.name || '通用科研库',
+            lastPublish: '2026-05-21',
+            version: 'V2'
+          }
+        }
+      ];
+      setCustomWorkflows(defaultWorkflows);
+      setSelectedWorkflowId(db.selectedWorkflowId || 'wf-1');
+    }
     setActiveMenuId(null);
   };
 
@@ -354,16 +530,6 @@ export const DatabaseSourceManager = () => {
                     {exportingDb.name}
                   </span>
                 </div>
-
-                <button
-                  onClick={() => {
-                    triggerToast('导出配置保存成功！');
-                    setExportingDb(null);
-                  }}
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-sm hover:shadow transition-all cursor-pointer border-0"
-                >
-                  完成配置并保持
-                </button>
               </div>
 
               {/* 导出审批 Switch */}
@@ -388,173 +554,79 @@ export const DatabaseSourceManager = () => {
               </div>
 
               {/* 审批方式 Card style selection */}
-              <div className="flex items-center gap-4 py-1.5 select-none">
-                <span className="text-slate-500 font-bold text-xs w-20 shrink-0">审批方式：</span>
-                <div className="flex items-center gap-4">
-                  {/* OA审批 Option */}
-                  <div
-                    onClick={() => setApprovalType('oa')}
-                    className={`flex items-center gap-3 px-5 py-3 rounded-xl border-2 cursor-pointer transition-all select-none ${
-                      approvalType === 'oa'
-                        ? 'border-blue-600 bg-blue-50/10'
-                        : 'border-slate-200 hover:border-slate-300 bg-white'
-                    }`}
-                  >
-                    <div className="relative flex items-center justify-center shrink-0">
-                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${
-                        approvalType === 'oa' ? 'border-blue-600 bg-blue-600' : 'border-slate-300 bg-white'
-                      }`}>
-                        {approvalType === 'oa' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+              {exportApproval && (
+                <div className="flex items-center gap-4 py-1.5 select-none animate-fade-in">
+                  <span className="text-slate-500 font-bold text-xs w-20 shrink-0">审批方式：</span>
+                  <div className="flex items-center gap-4">
+                    {/* OA审批 Option */}
+                    <div
+                      onClick={() => setApprovalType('oa')}
+                      className={`flex items-center gap-3 px-5 py-3 rounded-xl border-2 cursor-pointer transition-all select-none ${
+                        approvalType === 'oa'
+                          ? 'border-blue-600 bg-blue-50/10'
+                          : 'border-slate-200 hover:border-slate-300 bg-white'
+                      }`}
+                    >
+                      <div className="relative flex items-center justify-center shrink-0">
+                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${
+                          approvalType === 'oa' ? 'border-blue-600 bg-blue-600' : 'border-slate-300 bg-white'
+                        }`}>
+                          {approvalType === 'oa' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                        </div>
                       </div>
+                      <span className={`text-xs ${approvalType === 'oa' ? 'text-slate-900 font-bold' : 'text-slate-600 font-bold'}`}>
+                        OA审批
+                      </span>
                     </div>
-                    <span className={`text-xs ${approvalType === 'oa' ? 'text-slate-900 font-bold' : 'text-slate-600 font-bold'}`}>
-                      OA审批
-                    </span>
-                  </div>
 
-                  {/* 科研平台审批 Option */}
-                  <div
-                    onClick={() => setApprovalType('platform')}
-                    className={`flex items-center gap-3 px-5 py-3 rounded-xl border-2 cursor-pointer transition-all select-none ${
-                      approvalType === 'platform'
-                        ? 'border-blue-600 bg-blue-50/10'
-                        : 'border-slate-200 hover:border-slate-300 bg-white'
-                    }`}
-                  >
-                    <div className="relative flex items-center justify-center shrink-0">
-                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${
-                        approvalType === 'platform' ? 'border-blue-600 bg-blue-600' : 'border-slate-300 bg-white'
-                      }`}>
-                        {approvalType === 'platform' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                    {/* 科研平台审批 Option */}
+                    <div
+                      onClick={() => setApprovalType('platform')}
+                      className={`flex items-center gap-3 px-5 py-3 rounded-xl border-2 cursor-pointer transition-all select-none ${
+                        approvalType === 'platform'
+                          ? 'border-blue-600 bg-blue-50/10'
+                          : 'border-slate-200 hover:border-slate-300 bg-white'
+                      }`}
+                    >
+                      <div className="relative flex items-center justify-center shrink-0">
+                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${
+                          approvalType === 'platform' ? 'border-blue-600 bg-blue-600' : 'border-slate-300 bg-white'
+                        }`}>
+                          {approvalType === 'platform' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                        </div>
                       </div>
+                      <span className={`text-xs ${approvalType === 'platform' ? 'text-slate-900 font-bold' : 'text-slate-600 font-bold'}`}>
+                        科研平台审批
+                      </span>
                     </div>
-                    <span className={`text-xs ${approvalType === 'platform' ? 'text-slate-900 font-bold' : 'text-slate-600 font-bold'}`}>
-                      科研平台审批
-                    </span>
                   </div>
                 </div>
-              </div>
+              )}
+            </div>
 
-              {/* Config panel when using Platform workflow */}
-              {exportApproval && approvalType === 'platform' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                  {customWorkflows.map((item) => {
-                    const isActive = selectedWorkflowId === item.id;
-                    return (
-                      <div
-                        key={item.id}
-                        onClick={() => setSelectedWorkflowId(item.id)}
-                        className={`p-6 rounded-2xl border-2 text-left cursor-pointer transition-all relative ${
-                          isActive
-                            ? 'bg-white border-blue-600 shadow-[0_4px_20px_rgba(37,99,235,0.04)]'
-                            : 'bg-white border-slate-200/80 hover:border-slate-350 shadow-sm'
-                        }`}
-                      >
-                        {/* Delete button (cross) in top-right */}
-                        {customWorkflows.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const remaining = customWorkflows.filter(c => c.id !== item.id);
-                              setCustomWorkflows(remaining);
-                              if (selectedWorkflowId === item.id) {
-                                setSelectedWorkflowId(remaining[0].id);
-                              }
-                              triggerToast(`已成功删除审批流 【${item.name}】 `);
-                            }}
-                            className="absolute top-4 right-4 w-5 h-5 rounded-full bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-500 border border-slate-200/80 flex items-center justify-center transition-all cursor-pointer z-10 text-[10px] font-bold"
-                            title="删除"
-                          >
-                            ✕
-                          </button>
-                        )}
-
-                        {/* 2x2 scenes list inside the card */}
-                        <div className="grid grid-cols-2 gap-3.5 mt-2">
-                          {['数据中心', '数据检索', '患者收藏', '课题'].map(modName => {
-                            const isBoundHere = item.modules.includes(modName);
-                            const otherBoundFlow = customWorkflows.find(f => f.id !== item.id && f.modules.includes(modName));
-
-                            return (
-                              <button
-                                key={modName}
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedWorkflowId(item.id);
-                                  if (isBoundHere) {
-                                    setCustomWorkflows(prev => prev.map(flow => {
-                                      if (flow.id === item.id) {
-                                        return {
-                                          ...flow,
-                                          modules: flow.modules.filter(m => m !== modName)
-                                        };
-                                      }
-                                      return flow;
-                                    }));
-                                    triggerToast(`【${modName}】已取消关联！`);
-                                  } else {
-                                    setCustomWorkflows(prev => prev.map(flow => {
-                                      if (flow.id === item.id) {
-                                        return {
-                                          ...flow,
-                                          modules: [...flow.modules.filter(m => m !== modName), modName]
-                                        };
-                                      } else if (otherBoundFlow && flow.id === otherBoundFlow.id) {
-                                        return {
-                                          ...flow,
-                                          modules: flow.modules.filter(m => m !== modName)
-                                        };
-                                      }
-                                      return flow;
-                                    }));
-                                    triggerToast(otherBoundFlow
-                                      ? `已将【${modName}】从【${otherBoundFlow.name}】改配至【${item.name}】`
-                                      : `【${modName}】已关联到【${item.name}】`);
-                                  }
-                                }}
-                                className={`flex items-center justify-between px-3.5 py-3 border rounded-xl text-xs font-bold text-left transition-all ${
-                                  isBoundHere
-                                    ? 'bg-blue-50/20 border-blue-500 text-slate-805'
-                                    : otherBoundFlow
-                                      ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
-                                      : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600'
-                                }`}
-                              >
-                                <span className="truncate">{modName}</span>
-                                <span className="text-[10px] font-semibold flex items-center gap-1.5 shrink-0">
-                                  {isBoundHere ? (
-                                    <span className="text-blue-600 flex items-center gap-1">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600 inline-block" />
-                                      已关联
-                                    </span>
-                                  ) : otherBoundFlow ? (
-                                    <span className="text-slate-400">其他占用</span>
-                                  ) : (
-                                    <span className="text-slate-400 flex items-center gap-1 font-normal">
-                                      <span className="w-1.5 h-1.5 rounded-full border border-slate-300 inline-block" />
-                                      未关联
-                                    </span>
-                                  )}
-                                </span>
-                              </button>
-                            );
-                          })}
+            {/* Split layout for workflows left-list & right-config */}
+            {exportApproval && approvalType === 'platform' && (
+              <div className="flex-1 flex gap-6 min-h-[850px] items-stretch select-none">
+                {/* Left Column: Workflows Sidebar list */}
+                <div className="w-[240px] flex flex-col gap-4 select-none shrink-0">
+                  <div className="flex flex-col gap-2.5 max-h-[620px] overflow-y-auto custom-scrollbar pr-1">
+                    {customWorkflows.map((item) => {
+                      const isActive = selectedWorkflowId === item.id;
+                      return (
+                        <div
+                          key={item.id}
+                          onClick={() => setSelectedWorkflowId(item.id)}
+                          className={`px-5 py-3.5 rounded-xl text-left cursor-pointer transition-all select-none border shadow-sm relative ${
+                            isActive
+                              ? 'bg-blue-600 border-blue-600 text-white font-bold text-xs'
+                              : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700 hover:text-slate-950 text-xs'
+                          }`}
+                        >
+                          <span className="truncate block pr-2">{item.name}</span>
                         </div>
-
-                        {/* Card footer: version info */}
-                        <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between">
-                          <span className={`text-[11px] font-bold ${isActive ? 'text-blue-600' : 'text-slate-400'}`}>
-                            {isActive ? '● 已选中' : '点击切换'}
-                          </span>
-                          <span className="px-2 py-[1.5px] text-[10px] rounded font-mono font-bold bg-slate-50 text-slate-500 border border-slate-200">
-                            版本：{item.workflow.version === 'V1' || item.workflow.version === 'V2' ? `${item.workflow.version}.0` : item.workflow.version}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
 
                   {/* "+ 自定义数据导出审批流" dashed button card */}
                   <div
@@ -578,49 +650,92 @@ export const DatabaseSourceManager = () => {
                           version: 'V1'
                         }
                       };
-                      setCustomWorkflows(prev => [...prev, newFlowObj]);
+                      const nextFlows = [...customWorkflows, newFlowObj];
+                      setCustomWorkflows(nextFlows);
                       setSelectedWorkflowId(newId);
-                      triggerToast(`新建审批流【${newName}】成功！ 画面正自动下拉加载其设计卡片`);
+                      
+                      // Auto save the new workflow to database list!
+                      setDatabases(prev => prev.map(d => {
+                        if (d.id === exportingDb.id) {
+                          return {
+                            ...d,
+                            selectedWorkflowId: newId,
+                            customWorkflows: nextFlows
+                          };
+                        }
+                        return d;
+                      }));
+                      triggerToast(`已成功创建并单独保存新工作流【${newName}】！`);
                     }}
-                    className="border-2 border-dashed border-slate-200 hover:border-blue-500 bg-white hover:bg-slate-50/30 rounded-2xl flex flex-col items-center justify-center p-8 text-center cursor-pointer transition-all shadow-sm group min-h-[160px]"
+                    className="border border-dashed border-blue-500 hover:border-blue-600 bg-white hover:bg-blue-50/20 rounded-xl flex items-center justify-center p-4 gap-2 text-center cursor-pointer transition-all shadow-sm text-blue-600 font-bold text-xs"
                   >
-                    <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white mb-2 shadow-sm shadow-blue-500/10 group-hover:scale-105 transition-transform">
-                      <span className="text-xl font-bold">+</span>
-                    </div>
-                    <span className="text-xs font-bold text-slate-500 group-hover:text-slate-700">
-                      自定义数据导出审批流
-                    </span>
+                    <span className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-sm font-bold">+</span>
+                    <span>自定义数据导出审批流</span>
                   </div>
                 </div>
-              )}
-            </div>
 
-            {/* Underneath scientific-platform workflow space */}
-            {exportApproval && approvalType === 'platform' && (
-              <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-white flex flex-col shrink-0" style={{ minHeight: '850px' }}>
-                <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-600 flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                    工作流配置设计面板 
-                  </span>
-                </div>
-                <div className="flex-1 flex flex-col relative" style={{ minHeight: '800px' }}>
+                {/* Right Column: Workflow Designer Workspace */}
+                <div className="flex-1 bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-sm relative flex flex-col min-h-[800px]">
                   <WorkflowDesigner
                     workflow={customWorkflows.find(f => f.id === selectedWorkflowId)?.workflow || customWorkflows[0].workflow}
                     onSave={(updated) => {
+                      // Save action
                       setCustomWorkflows(prev => prev.map(flow => {
                         if (flow.id === selectedWorkflowId) {
                           return {
                             ...flow,
+                            name: updated.name,
                             workflow: updated
                           };
                         }
                         return flow;
                       }));
-                      const targetName = customWorkflows.find(f => f.id === selectedWorkflowId)?.name || '工作流';
-                      triggerToast(`【${targetName}】设计已成功保存并实时热部署！`);
+                      
+                      setDatabases(prev => prev.map(d => {
+                        if (d.id === exportingDb.id) {
+                          const updatedWorkflows = (d.customWorkflows || customWorkflows).map(flow => {
+                            if (flow.id === selectedWorkflowId) {
+                              return {
+                                ...flow,
+                                name: updated.name,
+                                workflow: updated
+                              };
+                            }
+                            return flow;
+                          });
+                          return {
+                            ...d,
+                            customWorkflows: updatedWorkflows
+                          };
+                        }
+                        return d;
+                      }));
+
+                      const targetName = updated.name || '工作流';
+                      triggerToast(`【${targetName}】流程配置已保存成功！`);
                     }}
                     onClose={() => setExportingDb(null)}
+                    onDelete={() => {
+                      if (customWorkflows.length <= 1) {
+                        triggerToast('这是最后一个工作流，无法删除！');
+                        return;
+                      }
+                      const remaining = customWorkflows.filter(c => c.id !== selectedWorkflowId);
+                      setCustomWorkflows(remaining);
+                      setSelectedWorkflowId(remaining[0].id);
+                      setDatabases(prev => prev.map(d => {
+                        if (d.id === exportingDb.id) {
+                          return {
+                            ...d,
+                            customWorkflows: remaining,
+                            selectedWorkflowId: remaining[0].id
+                          };
+                        }
+                        return d;
+                      }));
+                      triggerToast('工作流已成功删除！');
+                    }}
+                    onReference={handleOpenReferenceModal}
                   />
                 </div>
               </div>
@@ -1011,6 +1126,188 @@ export const DatabaseSourceManager = () => {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* --- REFERENCE OTHER DATABASE WORKFLOW CONFIG MODAL --- */}
+      <AnimatePresence>
+        {showReferenceModal && exportingDb && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowReferenceModal(false)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            />
+
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden relative z-[101] flex flex-col max-h-[90vh]"
+            >
+              {/* Header */}
+              <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50 select-none">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                    <Copy className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-slate-800 text-sm">引用其他科研库工作流配置</h3>
+                    <p className="text-[10px] text-slate-400 font-medium">快速导入已有科研库配置成熟的审批流方案</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setShowReferenceModal(false)}
+                  className="p-1 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-600 cursor-pointer border-0 bg-transparent transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-6 overflow-y-auto space-y-5 flex-1 text-xs text-slate-700">
+                {/* 1. Target Database Selection */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                    选择源科研数据库*
+                  </label>
+                  <select
+                    value={referenceSourceDbId}
+                    onChange={(e) => handleSourceDatabaseChange(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 font-bold outline-none focus:border-blue-500 focus:bg-white transition-all cursor-pointer"
+                  >
+                    <option value="" disabled>-- 请选择作为引用源的科研库 --</option>
+                    {databases
+                      .filter(d => d.id !== exportingDb.id)
+                      .map(d => {
+                        const count = getWorkflowsForDatabase(d).length;
+                        return (
+                          <option key={d.id} value={d.id}>
+                            {d.name} ({count}个工作流)
+                          </option>
+                        );
+                      })}
+                  </select>
+                </div>
+
+                {/* 2. Workflows checklist of chosen database */}
+                {referenceSourceDbId && (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                      选择要引用的工作流* (可多选)
+                    </label>
+                    <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/30 max-h-48 overflow-y-auto divide-y divide-slate-100">
+                      {getWorkflowsForDatabase(databases.find(d => d.id === referenceSourceDbId)!).map((wf) => {
+                        const isChecked = referenceWorkflowIds.includes(wf.id);
+                        return (
+                          <div 
+                            key={wf.id}
+                            onClick={() => {
+                              if (isChecked) {
+                                setReferenceWorkflowIds(prev => prev.filter(id => id !== wf.id));
+                              } else {
+                                setReferenceWorkflowIds(prev => [...prev, wf.id]);
+                              }
+                            }}
+                            className="flex items-start gap-3 p-3 hover:bg-slate-50 cursor-pointer select-none transition-all"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {}} // handled by parent onClick
+                              className="mt-0.5 rounded text-blue-600 focus:ring-blue-500"
+                            />
+                            <div className="space-y-1 pl-1">
+                              <span className="font-bold text-slate-800 text-xs block">{wf.name}</span>
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {wf.modules.map(mod => (
+                                  <span key={mod} className="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold">
+                                    {mod}
+                                  </span>
+                                ))}
+                                {wf.modules.length === 0 && (
+                                  <span className="text-[9px] text-slate-400 font-medium">未绑定任何模块</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. Reference mode choosing */}
+                <div className="space-y-2.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                    选择导入模式*
+                  </label>
+                  <div className="grid grid-cols-2 gap-3.5">
+                    {/* Append */}
+                    <div
+                      onClick={() => setReferenceMode('append')}
+                      className={`flex flex-col p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                        referenceMode === 'append'
+                          ? 'border-blue-600 bg-blue-50/10'
+                          : 'border-slate-200 hover:border-slate-300 bg-white'
+                      }`}
+                    >
+                      <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5 mb-1 select-none">
+                        <span className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${referenceMode === 'append' ? 'border-blue-600' : 'border-slate-300'}`}>
+                          {referenceMode === 'append' && <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />}
+                        </span>
+                        <span>追加并共存</span>
+                      </span>
+                      <span className="text-[10px] text-slate-400 leading-normal pl-5 font-medium">
+                        复制选中审批流并新增至本库，保留当前已设计的全部内容。
+                      </span>
+                    </div>
+
+                    {/* Overwrite */}
+                    <div
+                      onClick={() => setReferenceMode('overwrite')}
+                      className={`flex flex-col p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                        referenceMode === 'overwrite'
+                          ? 'border-red-600 bg-red-50/5'
+                          : 'border-slate-200 hover:border-slate-300 bg-white'
+                      }`}
+                    >
+                      <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5 mb-1 select-none">
+                        <span className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${referenceMode === 'overwrite' ? 'border-red-600' : 'border-slate-300'}`}>
+                          {referenceMode === 'overwrite' && <span className="w-1.5 h-1.5 rounded-full bg-red-600" />}
+                        </span>
+                        <span>覆盖当前配置</span>
+                      </span>
+                      <span className="text-[10px] text-slate-400 leading-normal pl-5 font-medium">
+                        清空当前本库的工作流，完全以选中的目标工作流进行替代。
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowReferenceModal(false)}
+                  className="px-4.5 py-2 bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmReference}
+                  disabled={!referenceSourceDbId || referenceWorkflowIds.length === 0}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer border-0"
+                >
+                  确认导入配置
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

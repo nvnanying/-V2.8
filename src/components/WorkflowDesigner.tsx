@@ -80,14 +80,17 @@ interface BPMNEdge {
   condDataVolumeMin?: string;
   condDataVolumeMax?: string;
   condDataTables?: string[];
-  condSelectMode?: 'userIdentity' | 'dataVolume' | 'dataTable' | 'spel';
+  condSelectMode?: 'userIdentity' | 'dataVolume' | 'dataTable' | 'spel' | 'default';
   condSpel?: string;
+  condDefaultExpr?: string;
 }
 
 interface WorkflowDesignerProps {
   workflow: WorkflowItem;
   onSave: (updated: WorkflowItem) => void;
   onClose: () => void;
+  onDelete?: () => void;
+  onReference?: () => void;
 }
 
 // --- Hardcoded Preset Diagrams for absolute screenshot look ---
@@ -112,7 +115,7 @@ const DEFAULT_EDGES: BPMNEdge[] = [
   { id: 'e6', from: 'task2', to: 'gate2', label: '', routeType: 'right-down-left' },
   { id: 'e7', from: 'task3', to: 'gate2', label: '', routeType: 'custom' },
   { id: 'e8', from: 'task4', to: 'gate2', label: '', routeType: 'custom' },
-  { id: 'e9', from: 'gate2', to: 'task5', label: '', routeType: 'straight-v', condType: '条件分支', condName: '病历数', condOp: '大于', condVal: '1000', condDataVolumeMin: '1000', condDataTables: ['病历信息表'], condSelectMode: 'dataVolume' },
+  { id: 'e9', from: 'gate2', to: 'task5', label: '', routeType: 'straight-v', condType: '条件分支', condName: '病历数', condOp: '大于', condVal: '1000', condDataVolumeMax: '5000', condDataTables: ['病历信息表'], condSelectMode: 'dataVolume' },
   { id: 'e10', from: 'gate2', to: 'end', label: '', routeType: 'custom', condType: '条件分支', condName: '病历数', condOp: '小于等于', condVal: '1000', condDataVolumeMax: '1000', condDataTables: ['病历信息表'], condSelectMode: 'dataVolume' },
   { id: 'e11', from: 'task5', to: 'end', label: '', routeType: 'straight-h' },
 ];
@@ -133,7 +136,7 @@ const SPEL_PRESETS = [
   { name: '导出审批-课题负责人-动态...', code: '无', key: '@topicWorkflowHelper.getLeaderUserId(#topicId)', group: '默认分组', created: '2026-06-16 14:01:20' },
 ];
 
-export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesignerProps) {
+export function WorkflowDesigner({ workflow, onSave, onClose, onDelete, onReference }: WorkflowDesignerProps) {
   // Sync state with parent details
   const [flowId, setFlowId] = useState(workflow.id || 'p_' + Date.now().toString().slice(3));
   const [flowName, setFlowName] = useState(workflow.name || '新建流程_复制');
@@ -333,6 +336,28 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
     // Record initial checkpoint
     recordHistory(DEFAULT_NODES, DEFAULT_EDGES);
   }, []);
+
+  useEffect(() => {
+    if (workflow) {
+      setFlowId(workflow.id || '');
+      setFlowName(workflow.name || '');
+      setCategory(workflow.category || '数据导出');
+      
+      const libs = workflow.formName 
+        ? workflow.formName.split(',').map((s: string) => s.trim()).filter(Boolean)
+        : ['全院科研数据中心'];
+      setSelectedLibraries(libs);
+      
+      const subConfigsStr = (workflow as any).subConfigs;
+      const subCfgs = subConfigsStr
+        ? subConfigsStr.split(',').map((s: string) => s.trim()).filter(Boolean)
+        : ['数据中心', '数据检索'];
+      setSelectedSubConfigs(subCfgs);
+      
+      setVisible(workflow.visible !== false);
+      setPermissions(workflow.visibleRange === '全员' ? 'all' : 'select');
+    }
+  }, [workflow]);
 
   const handleUndo = () => {
     if (historyIndex > 0) {
@@ -645,40 +670,80 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
         )}
       </AnimatePresence>
 
-      {/* Top Navigation Tabs */}
-      <div className="h-[64px] bg-white border-b border-slate-200 flex items-center justify-center relative shrink-0">
-        <div className="absolute left-6 top-1/2 -translate-y-1/2">
-          <div 
-            onClick={onClose}
-            className="w-[36px] h-[28px] border border-slate-200 rounded-[4px] flex items-center justify-center cursor-pointer shadow-sm hover:bg-slate-50 transition-colors"
-          >
-            <Tag className="w-4 h-4 text-red-500 fill-red-50" />
+      {/* Top Navigation Tabs configured exactly as the image */}
+      <div className="bg-white border-b border-slate-200 select-none shrink-0 flex flex-col">
+        {/* Line 1: Header / Action Row */}
+        <div className="h-[56px] px-6 flex items-center justify-between border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <span className="font-extrabold text-slate-800 text-[15px]">工作流配置设计面板</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {onDelete && (
+              <button
+                type="button"
+                onClick={onDelete}
+                className="px-4 py-2 bg-[#f1f5f9] hover:bg-[#e2e8f0] text-slate-600 rounded-lg text-xs font-bold transition-all cursor-pointer border border-slate-200/80"
+              >
+                删除
+              </button>
+            )}
+            {onReference && (
+              <button
+                type="button"
+                onClick={onReference}
+                className="px-4 py-2 bg-white hover:bg-blue-50 text-blue-600 border border-blue-500 rounded-lg text-xs font-bold transition-all cursor-pointer"
+              >
+                引用其他库配置
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                const updatedWorkflow: WorkflowItem = {
+                  ...workflow,
+                  id: flowId,
+                  name: flowName,
+                  category: category,
+                  visible: visible,
+                  visibleRange: permissions === 'all' ? '全员' : '指定',
+                  formName: selectedLibraries.join(', '),
+                  version: workflow.version,
+                };
+                (updatedWorkflow as any).subConfigs = selectedSubConfigs.join(', ');
+                onSave(updatedWorkflow);
+              }}
+              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer border-0 shadow-sm"
+            >
+              完成配置并保持
+            </button>
           </div>
         </div>
-        
-        <div className="flex bg-slate-50/80 rounded-[6px] p-1 gap-1 border border-slate-100 shadow-sm">
-          <button 
-            onClick={() => setActiveTab('basic')}
-            className={`flex items-center gap-2 px-8 py-2.5 rounded-[4px] text-[14px] font-medium transition-all duration-200 ${
-              activeTab === 'basic' 
-                ? 'bg-[#2b5df2] text-white shadow-sm' 
-                : 'text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            <Pencil className={`w-[15px] h-[15px] ${activeTab === 'basic' ? 'text-red-300 fill-white/20' : 'text-slate-400'}`} /> 
-            基础信息
-          </button>
-          <button 
-            onClick={() => setActiveTab('design')}
-            className={`flex items-center gap-2 px-8 py-2.5 rounded-[4px] text-[14px] font-medium transition-all duration-200 ${
-              activeTab === 'design' 
-                ? 'bg-white text-slate-700 shadow-sm border border-slate-200/50' 
-                : 'text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            <Network className={`w-[15px] h-[15px] ${activeTab === 'design' ? 'text-orange-400 fill-orange-50' : 'text-slate-400'}`} /> 
-            流程设计
-          </button>
+
+        {/* Line 2: Centered Tabs Row */}
+        <div className="h-[48px] flex items-center justify-center bg-[#f8fafc]">
+          <div className="flex bg-slate-200/50 rounded-lg p-1 gap-1 border border-slate-200/30 shadow-sm">
+            <button 
+              onClick={() => setActiveTab('basic')}
+              className={`flex items-center gap-1.5 px-6 py-1.5 rounded-md text-xs font-bold transition-all duration-200 ${
+                activeTab === 'basic' 
+                  ? 'bg-blue-600 text-white shadow-sm' 
+                  : 'text-slate-600 hover:bg-slate-200/50'
+              }`}
+            >
+              基础信息
+            </button>
+            <button 
+              onClick={() => setActiveTab('design')}
+              className={`flex items-center gap-1.5 px-6 py-1.5 rounded-md text-xs font-bold transition-all duration-200 ${
+                activeTab === 'design' 
+                  ? 'bg-blue-600 text-white shadow-sm' 
+                  : 'text-slate-600 hover:bg-slate-200/50'
+              }`}
+            >
+              流程设计
+            </button>
+          </div>
         </div>
       </div>
 
@@ -752,7 +817,7 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
                             <Computer className="w-5 h-5 text-white" />
                           </div>
                           <div>
-                            <h4 className="font-bold text-slate-800 mb-0.5 text-[15px]">经典模型</h4>
+                            <h4 className="font-bold text-blue-500 mb-0.5 text-[15px]">经典模型</h4>
                             <p className="text-slate-400 text-[12px]">自由拖拽连线，灵活编排流程</p>
                           </div>
                         </div>
@@ -791,48 +856,6 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
                         <option value="权限审批">权限审批</option>
                       </select>
                       <ChevronDown className="w-4 h-4 text-slate-400 absolute left-[295px] top-1/2 -translate-y-1/2 pointer-events-none" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* 自定义表单 */}
-                <div className="flex text-[14px]">
-                  <div className="w-[120px] pt-2 text-slate-700 font-semibold flex-shrink-0">
-                    <span className="text-red-500 mr-1">*</span>自定义表单
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex gap-4">
-                      <div 
-                        onClick={() => setCustomForm('no')}
-                        className={`flex-1 border rounded-md p-4 cursor-pointer relative transition-all overflow-hidden ${
-                          customForm === 'no' 
-                            ? 'border-blue-400 bg-blue-50/40' 
-                            : 'border-slate-200 bg-white hover:border-blue-300'
-                        }`}
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="w-8 h-8 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0 text-blue-500">
-                            <FileText className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <h4 className="font-bold text-slate-800 mb-0.5 text-[15px]">否</h4>
-                            <p className="text-slate-400 text-[12px]">填写页面路径</p>
-                          </div>
-                        </div>
-                        <div className={`absolute right-4 top-4 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${customForm === 'no' ? 'border-blue-500 bg-blue-500' : 'border-slate-300'}`}>
-                          {customForm === 'no' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                        </div>
-                        {customForm === 'no' && (
-                          <div className="absolute right-0 bottom-0 text-blue-500 pointer-events-none">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                              <path d="M24 0V24H0L24 0Z" fill="currentColor"/>
-                              <path d="M17 9L11 15L7.5 11.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                          </div>
-                        )}
-                      </div>
-
-
                     </div>
                   </div>
                 </div>
@@ -1103,18 +1126,19 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
                         // Dynamically compile summary label if none is custom-typed
                         let displayLabel = edge.label;
                         if (!displayLabel) {
-                          const mode = edge.condSelectMode || (edge.condUserIdentities && edge.condUserIdentities.length > 0 ? 'userIdentity' : (edge.condDataVolumeMin || edge.condDataVolumeMax ? 'dataVolume' : (edge.condDataTables && edge.condDataTables.length > 0 ? 'dataTable' : (edge.condSpel ? 'spel' : 'userIdentity'))));
+                          const mode = edge.condSelectMode || (edge.condUserIdentities && edge.condUserIdentities.length > 0 ? 'userIdentity' : (edge.condDataVolumeMin || edge.condDataVolumeMax ? 'dataVolume' : (edge.condDataTables && edge.condDataTables.length > 0 ? 'dataTable' : (edge.condSpel ? 'spel' : (edge.condDefaultExpr ? 'default' : 'userIdentity')))));
                           
                           if (mode === 'userIdentity' && edge.condUserIdentities && edge.condUserIdentities.length > 0) {
                             displayLabel = edge.condUserIdentities.join('/');
-                          } else if (mode === 'dataVolume' && (edge.condDataVolumeMin || edge.condDataVolumeMax)) {
-                            const min = edge.condDataVolumeMin || '0';
+                          } else if (mode === 'dataVolume') {
                             const max = edge.condDataVolumeMax || '无上限';
-                            displayLabel = `${min}-${max}条`;
+                            displayLabel = max === '无上限' ? '病历数无上限' : `≤${max}条`;
                           } else if (mode === 'dataTable' && edge.condDataTables && edge.condDataTables.length > 0) {
                             displayLabel = `${edge.condDataTables.length}张表`;
                           } else if (mode === 'spel' && edge.condSpel) {
                             displayLabel = edge.condSpel;
+                          } else if (mode === 'default' && edge.condDefaultExpr) {
+                            displayLabel = edge.condDefaultExpr;
                           }
                         }
                         
@@ -1884,20 +1908,6 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
                           <span className="font-bold text-[13px] text-slate-700">基础配置</span>
                         </div>
 
-                        {/* 节点编码 */}
-                        <div className="space-y-1.5">
-                          <label className="text-slate-600 font-bold text-xs block select-none">节点编码:</label>
-                          <input 
-                            type="text" 
-                            value={node.id}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setNodes(prev => prev.map(item => item.id === node.id ? { ...item, id: val } : item));
-                            }}
-                            className="w-full border border-slate-200 rounded-lg px-3 py-1.5 outline-none text-xs text-slate-700 bg-white h-9 focus:border-blue-500 transition-colors font-mono"
-                          />
-                        </div>
-
                         {/* 节点名称 */}
                         <div className="space-y-1.5">
                           <label className="text-slate-600 font-bold text-xs block select-none">节点名称:</label>
@@ -1947,41 +1957,6 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
                             })}
                           </div>
                         </div>
-
-                        {/* 自定义表单 */}
-                        <div className="space-y-2">
-                          <label className="text-slate-600 font-bold text-xs block select-none">自定义表单:</label>
-                          <div className="flex items-center gap-2.5 w-1/3">
-                            {[
-                              { id: 'no', label: '否' }
-                            ].map(opt => {
-                              const currentCustom = node.useCustomForm || 'no';
-                              const isSelected = currentCustom === opt.id;
-                              return (
-                                <button
-                                  key={opt.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setNodes(prev => prev.map(item => item.id === node.id ? { ...item, useCustomForm: opt.id as any } : item));
-                                  }}
-                                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 border rounded-xl text-xs font-semibold transition-all duration-200 ${
-                                    isSelected 
-                                      ? 'bg-blue-50/50 border-blue-500 text-blue-600 shadow-sm' 
-                                      : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50 text-slate-500'
-                                  }`}
-                                >
-                                  <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center transition-colors ${
-                                    isSelected ? 'border-blue-500 bg-blue-500' : 'border-slate-300 bg-white'
-                                  }`}>
-                                    {isSelected && <div className="w-1 h-1 rounded-full bg-white" />}
-                                  </div>
-                                  <span>{opt.label}</span>
-                                  <HelpCircle className="w-3.5 h-3.5 text-slate-300 ml-0.5 shrink-0" />
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
                       </div>
                     </div>
                   )}
@@ -1998,9 +1973,8 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
                         {/* Assignee Table */}
                         <div className="border border-slate-200/80 rounded-xl bg-white overflow-hidden shadow-sm">
                           {/* Table Headers */}
-                          <div className="grid grid-cols-[1.5fr_1fr_0.7fr] bg-slate-50/70 border-b border-slate-200/60 px-4 py-2.5 text-slate-500 font-bold text-xs select-none">
-                            <div>入库主键</div>
-                            <div className="text-center">权限名称</div>
+                          <div className="grid grid-cols-[2fr_1fr] bg-slate-50/70 border-b border-slate-200/60 px-4 py-2.5 text-slate-500 font-bold text-xs select-none">
+                            <div className="text-left">权限名称</div>
                             <div className="text-right">操作</div>
                           </div>
 
@@ -2012,20 +1986,8 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
                           ) : (
                             <div className="divide-y divide-slate-100 max-h-[220px] overflow-y-auto">
                               {node.assigneeList.map((item, idx) => (
-                                <div key={idx} className="grid grid-cols-[1.5fr_1fr_0.7fr] px-4 py-2 items-center text-slate-700 text-xs hover:bg-slate-50/50 transition-colors">
-                                  <div className="mr-2">
-                                    <input
-                                      type="text"
-                                      value={item.key}
-                                      onChange={(e) => {
-                                        const nextList = (node.assigneeList || []).map((val, i) => i === idx ? { ...val, key: e.target.value } : val);
-                                        setNodes(prev => prev.map(n => n.id === node.id ? { ...n, assigneeList: nextList } : n));
-                                      }}
-                                      className="w-full border border-slate-200 rounded px-2 py-1 outline-none text-xs text-slate-700 h-8 focus:border-blue-500 bg-white"
-                                      placeholder=""
-                                    />
-                                  </div>
-                                  <div className="text-center font-medium truncate px-2 text-slate-500" title={item.permission}>
+                                <div key={idx} className="grid grid-cols-[2fr_1fr] px-4 py-2 items-center text-slate-700 text-xs hover:bg-slate-50/50 transition-colors">
+                                  <div className="text-left font-medium truncate text-slate-700" title={item.permission}>
                                     {item.permission}
                                   </div>
                                   <div className="text-right">
@@ -2052,20 +2014,9 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
                           <button
                             type="button"
                             onClick={() => {
-                              const currentList = node.assigneeList || [];
-                              const nextList = [...currentList, { key: '', permission: '' }];
-                              setNodes(prev => prev.map(n => n.id === node.id ? { ...n, assigneeList: nextList } : n));
-                            }}
-                            className="flex-1 py-2 border border-dashed border-blue-400 hover:border-blue-500 hover:bg-blue-50/10 text-blue-600 rounded-lg text-xs font-bold transition-all duration-200 flex items-center justify-center gap-1 cursor-pointer"
-                          >
-                            <span>添加行</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
                               setIsSelectingPreset(true);
                             }}
-                            className="flex-1 py-2 border border-dashed border-slate-300 hover:border-slate-400 hover:bg-slate-50/20 text-slate-500 rounded-lg text-xs font-bold transition-all duration-200 flex items-center justify-center gap-1 cursor-pointer"
+                            className="w-full py-2 border border-dashed border-slate-300 hover:border-slate-400 hover:bg-slate-50/20 text-slate-500 rounded-lg text-xs font-bold transition-all duration-200 flex items-center justify-center gap-1 cursor-pointer"
                           >
                             <span>选择</span>
                           </button>
@@ -2182,6 +2133,9 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
                                     if (selectedKey !== 'spel') {
                                       updated.condSpel = '';
                                     }
+                                    if (selectedKey !== 'default') {
+                                      updated.condDefaultExpr = '';
+                                    }
                                     return updated;
                                   }
                                   return item;
@@ -2193,6 +2147,7 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
                               <option value="dataTable">指标表</option>
                               <option value="dataVolume">病历数</option>
                               <option value="spel">spel</option>
+                              <option value="default">默认</option>
                             </select>
                           </div>
 
@@ -2244,39 +2199,20 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
 
                           {mode === 'dataVolume' && (
                             <div className="space-y-2 animate-fade-in">
-                              <label className="text-slate-500 font-bold text-[11px] block select-none">
-                                病历数范围配置
+                              <label className="text-slate-500 font-bold text-[11px] block select-none uppercase tracking-wider">
+                                最大数量 (条)
                               </label>
-                              <div className="grid grid-cols-2 gap-2">
-                                <div className="space-y-1">
-                                  <span className="text-[10px] text-slate-400 font-medium">最小数量 (条)</span>
-                                  <input 
-                                    type="number" 
-                                    min="0"
-                                    placeholder="无下限"
-                                    value={edge.condDataVolumeMin || ''}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      setEdges(prev => prev.map(item => item.id === edge.id ? { ...item, condDataVolumeMin: val } : item));
-                                    }}
-                                    className="w-full border border-slate-200 rounded px-2.5 py-1 text-xs text-slate-700 bg-white h-8 focus:border-blue-500 transition-colors"
-                                  />
-                                </div>
-                                <div className="space-y-1">
-                                  <span className="text-[10px] text-slate-400 font-medium">最大数量 (条)</span>
-                                  <input 
-                                    type="number" 
-                                    min="0"
-                                    placeholder="无上限"
-                                    value={edge.condDataVolumeMax || ''}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      setEdges(prev => prev.map(item => item.id === edge.id ? { ...item, condDataVolumeMax: val } : item));
-                                    }}
-                                    className="w-full border border-slate-200 rounded px-2.5 py-1 text-xs text-slate-700 bg-white h-8 focus:border-blue-500 transition-colors"
-                                  />
-                                </div>
-                              </div>
+                              <input 
+                                type="number" 
+                                min="0"
+                                placeholder="请输入最大数量，不填则默认无上限"
+                                value={edge.condDataVolumeMax || ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setEdges(prev => prev.map(item => item.id === edge.id ? { ...item, condDataVolumeMax: val, condDataVolumeMin: '' } : item));
+                                }}
+                                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-100 transition-all outline-none"
+                              />
                             </div>
                           )}
 
@@ -2369,6 +2305,24 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
                               />
                             </div>
                           )}
+
+                          {mode === 'default' && (
+                            <div className="space-y-2 animate-fade-in">
+                              <label className="text-slate-500 font-bold text-[11px] block select-none uppercase tracking-wider">
+                                表达式
+                              </label>
+                              <input 
+                                type="text"
+                                placeholder="输入表达式，如: #user.identity == '普通用户'"
+                                value={edge.condDefaultExpr || ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setEdges(prev => prev.map(item => item.id === edge.id ? { ...item, condDefaultExpr: val } : item));
+                                }}
+                                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-100 transition-all outline-none"
+                              />
+                            </div>
+                          )}
                         </div>
                       );
                     })()}
@@ -2436,41 +2390,45 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
               </div>
 
               {/* Main Content columns */}
-              <div className="flex-1 min-h-0 grid grid-cols-[240px_1fr] p-5 gap-5 overflow-hidden">
+              <div className={`flex-1 min-h-0 grid p-5 gap-5 overflow-hidden ${
+                personnelActiveTab === 'spel' ? 'grid-cols-1' : 'grid-cols-[240px_1fr]'
+              }`}>
                 {/* Left col: 组织架构 */}
-                <div className="border border-slate-200 rounded-xl bg-slate-50/20 flex flex-col overflow-hidden">
-                  <div className="p-3 border-b border-slate-150 bg-white flex items-center justify-between select-none shrink-0">
-                    <div className="flex items-center gap-2 text-slate-700 font-bold text-xs">
-                      <FolderOpen className="w-4 h-4 text-blue-500" />
-                      <span>组织架构</span>
+                {personnelActiveTab !== 'spel' && (
+                  <div className="border border-slate-200 rounded-xl bg-slate-50/20 flex flex-col overflow-hidden">
+                    <div className="p-3 border-b border-slate-150 bg-white flex items-center justify-between select-none shrink-0">
+                      <div className="flex items-center gap-2 text-slate-700 font-bold text-xs">
+                        <FolderOpen className="w-4 h-4 text-blue-500" />
+                        <span>组织架构</span>
+                      </div>
+                      <ChevronDown className="w-4 h-4 text-slate-400" />
                     </div>
-                    <ChevronDown className="w-4 h-4 text-slate-400" />
-                  </div>
-                  
-                  <div className="p-3 shrink-0 bg-white border-b border-slate-100">
-                    <div className="relative">
-                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
-                        value={deptSearch}
-                        onChange={(e) => setDeptSearch(e.target.value)}
-                        placeholder="搜索部门名称"
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-500 focus:bg-white transition-colors"
-                      />
+                    
+                    <div className="p-3 shrink-0 bg-white border-b border-slate-100">
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          value={deptSearch}
+                          onChange={(e) => setDeptSearch(e.target.value)}
+                          placeholder="搜索部门名称"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-500 focus:bg-white transition-colors"
+                        />
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="flex-1 flex flex-col items-center justify-center text-slate-400 text-xs py-10 select-none bg-white font-medium">
-                    暂无数据
+                    <div className="flex-1 flex flex-col items-center justify-center text-slate-400 text-xs py-10 select-none bg-white font-medium">
+                      暂无数据
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Right col: Filters + Table */}
                 <div className="flex flex-col min-h-0 space-y-4">
                   {/* Filters Card */}
                   <div className="bg-slate-50/70 border border-slate-200/60 rounded-xl p-4.5 space-y-4 shadow-sm shrink-0">
                     {/* Filter Inputs Grid */}
-                    <div className="grid grid-cols-[auto_1fr_auto_1fr_auto_1.6fr] gap-x-3.5 gap-y-3 items-center text-xs text-slate-600 font-bold select-none">
+                    <div className="grid gap-x-3.5 gap-y-3 items-center text-xs text-slate-600 font-bold select-none grid-cols-[auto_1fr_auto_1fr]">
                       <div className="text-right whitespace-nowrap">权限编码</div>
                       <input
                         type="text"
@@ -2488,27 +2446,6 @@ export function WorkflowDesigner({ workflow, onSave, onClose }: WorkflowDesigner
                         placeholder="请输入权限名称"
                         className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-500 transition-colors w-full h-9"
                       />
-
-                      <div className="text-right whitespace-nowrap">创建时间</div>
-                      <div className="flex items-center gap-2 border border-slate-200 bg-white rounded-lg px-2.5 h-9 text-slate-700 w-full">
-                        <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <input
-                          type="text"
-                          value={searchStartDate}
-                          onChange={(e) => setSearchStartDate(e.target.value)}
-                          placeholder="开始日期"
-                          className="bg-transparent text-xs w-full min-w-0 outline-none text-slate-700 placeholder-slate-400"
-                        />
-                        <span className="text-slate-400 select-none">-</span>
-                        <input
-                          type="text"
-                          value={searchEndDate}
-                          onChange={(e) => setSearchEndDate(e.target.value)}
-                          placeholder="结束日期"
-                          className="bg-transparent text-xs w-full min-w-0 outline-none text-slate-700 placeholder-slate-400 animate-none"
-                        />
-                        <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      </div>
                     </div>
 
                     {/* Filter Buttons */}
