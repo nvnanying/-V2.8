@@ -35,6 +35,9 @@ import { WorkflowDesigner } from './components/WorkflowDesigner';
 import { ApprovalCenter } from './components/ApprovalCenter';
 import { DatabaseSourceManager } from './components/DatabaseSourceManager';
 import { Dashboard } from './components/Dashboard';
+import { ResearchDataset } from './components/ResearchDataset';
+import { IndicatorLibrary, IndicatorFocus } from './components/IndicatorLibrary';
+import { DiseaseDataset, Indicator, LibGroup, PATIENT_INFO_CODE } from './components/researchData';
 
 // --- Types ---
 interface MenuItem {
@@ -309,6 +312,12 @@ export default function App() {
   ]);
   const [activeTab, setActiveTab] = useState('dashboard');
 
+  // 科研数据集 / 科研指标库 States（放在这里，切换页签后同步结果和编辑内容不丢失）
+  const [researchDatasets, setResearchDatasets] = useState<Record<number, DiseaseDataset>>({});
+  const [indicatorStore, setIndicatorStore] = useState<Record<string, Indicator[]>>({});
+  const [indicatorTrees, setIndicatorTrees] = useState<Record<number, LibGroup[]>>({});
+  const [indicatorFocus, setIndicatorFocus] = useState<IndicatorFocus | null>(null);
+
   // Dictionary States
   const [activeDictionaryId, setActiveDictionaryId] = useState('1');
   const [searchFilter, setSearchFilter] = useState('');
@@ -358,6 +367,12 @@ export default function App() {
     } else if (id === 'dashboard') {
       tabId = 'dashboard';
       tabName = '科研驾驶舱';
+    } else if (id === 'dataset') {
+      tabId = 'dataset';
+      tabName = '科研数据集';
+    } else if (id === 'indices') {
+      tabId = 'indices';
+      tabName = '科研指标库';
     } else {
       tabId = 'dictionary';
       tabName = '首页';
@@ -368,6 +383,16 @@ export default function App() {
       setTabs(prev => [...prev, { id: tabId, name: tabName, closable: tabId !== 'dictionary' }]);
     }
     setActiveTab(tabId);
+  };
+
+  const menuItemOfTab = (tabId: string) =>
+    ['workflow', 'approval-center', 'database', 'dashboard', 'dataset', 'indices'].includes(tabId) ? tabId : 'dictionary';
+
+  // 从科研数据集跳到科研指标库，定位"患者基本信息"并按指标名筛选
+  const handleViewIndicators = (indicatorName: string) => {
+    setIndicatorFocus({ dsCode: PATIENT_INFO_CODE, keyword: indicatorName, nonce: Date.now() });
+    setActiveItem('indices');
+    handleSelectTab('indices', '科研指标库');
   };
 
   // --- Dictionary Logic Handlers ---
@@ -589,17 +614,7 @@ export default function App() {
                 key={tab.id}
                 onClick={() => {
                   setActiveTab(tab.id);
-                  setActiveItem(
-                    tab.id === 'workflow' 
-                      ? 'workflow' 
-                      : tab.id === 'approval-center' 
-                        ? 'approval-center' 
-                        : tab.id === 'database'
-                          ? 'database'
-                          : tab.id === 'dashboard'
-                            ? 'dashboard'
-                            : 'dictionary'
-                  );
+                  setActiveItem(menuItemOfTab(tab.id));
                 }}
                 className={`px-4 py-1.5 rounded-t-md text-[13px] font-medium cursor-pointer transition-all duration-150 flex items-center gap-2 border-t border-x ${
                   activeTab === tab.id 
@@ -618,17 +633,7 @@ export default function App() {
                         const remaining = tabs.filter(t => t.id !== tab.id);
                         const fallback = remaining[remaining.length - 1]?.id || 'dictionary';
                         setActiveTab(fallback);
-                        setActiveItem(
-                          fallback === 'workflow' 
-                            ? 'workflow' 
-                            : fallback === 'approval-center' 
-                              ? 'approval-center' 
-                              : fallback === 'database'
-                                ? 'database'
-                                : fallback === 'dashboard'
-                                  ? 'dashboard'
-                                  : 'dictionary'
-                        );
+                        setActiveItem(menuItemOfTab(fallback));
                       }
                     }}
                   />
@@ -912,6 +917,14 @@ export default function App() {
               <DatabaseSourceManager />
             ) : activeTab === 'dashboard' ? (
               <Dashboard />
+            ) : activeTab === 'dataset' ? (
+              <motion.div key="dataset" initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} transition={{ duration: 0.15 }} className="flex-1 flex min-h-0 min-w-0">
+                <ResearchDataset datasets={researchDatasets} setDatasets={setResearchDatasets} onViewIndicators={handleViewIndicators} />
+              </motion.div>
+            ) : activeTab === 'indices' ? (
+              <motion.div key="indices" initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} transition={{ duration: 0.15 }} className="flex-1 flex min-h-0 min-w-0">
+                <IndicatorLibrary store={indicatorStore} setStore={setIndicatorStore} trees={indicatorTrees} setTrees={setIndicatorTrees} focus={indicatorFocus} onFocusHandled={() => setIndicatorFocus(null)} />
+              </motion.div>
             ) : (
               // Original Dictionary Main Editor Window component
               <motion.div 
