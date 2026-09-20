@@ -26,6 +26,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { WorkflowDesigner, WorkflowItem } from './WorkflowDesigner';
 import { DISEASE_ICONS, NewDiseaseDbWizard } from './NewDiseaseDbWizard';
+import { PermissionControl } from './PermissionControl';
 
 interface DatabaseSource {
   id: string;
@@ -193,6 +194,7 @@ export const DatabaseSourceManager = () => {
   const [newDbStartDate, setNewDbStartDate] = useState('2024-01-01');
   const [newDbEndDate, setNewDbEndDate] = useState('2026-05-21');
   const [editingDb, setEditingDb] = useState<DatabaseSource | null>(null);
+  const [permissionDb, setPermissionDb] = useState<DatabaseSource | null>(null);
 
   // States for dynamic export workflow configuration screen
   const [exportingDb, setExportingDb] = useState<DatabaseSource | null>(null);
@@ -534,6 +536,7 @@ export const DatabaseSourceManager = () => {
 
   return (
     <div className="flex-grow flex flex-col space-y-6 overflow-y-auto custom-scrollbar p-1 select-none text-slate-700 relative">
+      {permissionDb && <PermissionControl databaseName={permissionDb.name} admins={permissionDb.admins} onBack={() => setPermissionDb(null)} />}
       {/* Intercept to show modern export config panel matching user request screenshot */}
       {exportingDb && (
         <div className="absolute inset-0 bg-slate-50 flex flex-col overflow-y-auto custom-scrollbar z-40 text-slate-700 select-none">
@@ -970,11 +973,11 @@ export const DatabaseSourceManager = () => {
                           className="absolute right-0 top-6 w-24 bg-white border border-slate-200 rounded shadow-lg py-1 z-40 text-xs"
                         >
                           <button 
-                            onClick={() => handleStartEdit(db)}
+                            onClick={() => { setPermissionDb(db); setActiveMenuId(null); }}
                             className="w-full text-left px-3 py-1.5 hover:bg-slate-50 text-slate-600 flex items-center gap-1.5 font-bold"
                           >
-                            <Edit2 className="w-3 h-3 text-slate-400" />
-                            <span>编辑</span>
+                            <FolderLock className="w-3 h-3 text-slate-400" />
+                            <span>权限控制</span>
                           </button>
                           <button 
                             onClick={() => handleExportDbConfig(db)}
