@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { WorkflowDesigner, WorkflowItem } from './WorkflowDesigner';
+import { DISEASE_ICONS, NewDiseaseDbWizard } from './NewDiseaseDbWizard';
 
 interface DatabaseSource {
   id: string;
@@ -36,6 +37,7 @@ interface DatabaseSource {
   patientsCount: number;
   recordsCount: number;
   isCustomIcon?: boolean; // For JH传染病 custom sparkles
+  iconName?: string; // 新增专病库时选择的图标
   exportApproval?: boolean;
   approvalType?: 'oa' | 'platform';
   selectedWorkflowId?: string;
@@ -178,6 +180,7 @@ export const DatabaseSourceManager = () => {
   
   // Custom dialogs & dropdown controls
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -502,6 +505,32 @@ export const DatabaseSourceManager = () => {
     }
     setActiveMenuId(null);
   };
+
+  // 新增专病库：整页三步向导（基本设置 → 纳排设置 → 数据集设置）
+  if (showWizard) {
+    return (
+      <div className="flex-grow relative min-h-0 rounded-lg overflow-hidden">
+        <NewDiseaseDbWizard
+          onClose={() => setShowWizard(false)}
+          onSubmit={(result) => {
+            setDatabases(prev => [...prev, {
+              id: `db_custom_${Date.now()}`,
+              name: result.name,
+              admins: [result.admin],
+              timeSpan: '暂无数据周期',
+              lastUpdated: new Date().toISOString().split('T')[0],
+              usersCount: 1,
+              patientsCount: 0,
+              recordsCount: 0,
+              iconName: result.icon,
+            }]);
+            setShowWizard(false);
+            triggerToast(`专病库「${result.name}」已创建！`);
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex-grow flex flex-col space-y-6 overflow-y-auto custom-scrollbar p-1 select-none text-slate-700 relative">
@@ -878,7 +907,7 @@ export const DatabaseSourceManager = () => {
         </div>
 
         <button 
-          onClick={() => { setEditingDb(null); setShowAddModal(true); }}
+          onClick={() => setShowWizard(true)}
           className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-xs shadow-sm transition-all cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5" />
@@ -905,7 +934,9 @@ export const DatabaseSourceManager = () => {
                       ? 'bg-blue-100 border-blue-200 text-blue-600' 
                       : 'bg-blue-50 border-blue-100 text-blue-500'
                   }`}>
-                    {db.isCustomIcon ? (
+                    {db.iconName && DISEASE_ICONS[db.iconName] ? (
+                      React.createElement(DISEASE_ICONS[db.iconName], { className: 'w-4 h-4 text-blue-600' })
+                    ) : db.isCustomIcon ? (
                       <Biohazard className="w-4 h-4 text-blue-600 animate-pulse" />
                     ) : (
                       <Plus className="w-4 h-4 text-blue-600 font-bold" />
